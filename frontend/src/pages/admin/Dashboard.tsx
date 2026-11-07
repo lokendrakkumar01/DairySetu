@@ -1,0 +1,180 @@
+import { useQuery } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
+import { Users, Droplets, TrendingUp, AlertCircle, Milk, Moon, Sun, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { StatCard } from '@/components/ui/stat-card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { PageLoader } from '@/components/ui/loading-spinner'
+import { EmptyState } from '@/components/ui/empty-state'
+import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
+import api from '@/lib/api'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
+} from 'recharts'
+
+async function fetchDashboard() {
+  const res = await api.get('/api/admin/dashboard')
+  return res.data.data
+}
+
+async function fetchAnalytics() {
+  const start = new Date(); start.setDate(start.getDate() - 7)
+  const res = await api.get('/api/reports/analytics', {
+    params: { startDate: start.toISOString(), endDate: new Date().toISOString() }
+  })
+  return res.data.data
+}
+
+export default function Dashboard() {
+  const { dairy, user } = useAuth()
+
+  const { data: dash, isLoading } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: fetchDashboard,
+    refetchInterval: 60000,
+  })
+
+  const { data: analytics } = useQuery({
+    queryKey: ['analytics-7d'],
+    queryFn: fetchAnalytics,
+  })
+
+  if (isLoading) return <PageLoader />
+
+  const milkTrend = analytics?.dailyMilkTrend?.slice(-7) || []
+
+  return (
+    <div className="p-4 lg:p-6 space-y-6">
+      {/* Welcome */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">
+            नमस्ते, {dairy?.ownerName?.split(' ')[0] || user?.username} जी! 🙏
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">{dairy?.dairyName} · आज का सारांश</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-400">{new Date().toLocaleDateString('hi-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard title="कुल ग्राहक" value={dash?.totalCustomers || 0} icon={<Users className="w-5 h-5" />} color="green" subtitle={`${dash?.activeCustomers || 0} active`} />
+        <StatCard title="आज का दूध" value={dash?.todayMilkTotal || 0} suffix="L" icon={<Droplets className="w-5 h-5" />} color="blue" subtitle={`☀️ ${(dash?.morningTotal||0).toFixed(1)}L  🌙 ${(dash?.eveningTotal||0).toFixed(1)}L`} />
+        <StatCard title="मासिक आमदनी" value={dash?.monthlyRevenue || 0} prefix="₹" icon={<TrendingUp className="w-5 h-5" />} color="purple" />
+        <StatCard title="बकाया राशि" value={dash?.totalOutstanding || 0} prefix="₹" icon={<AlertCircle className="w-5 h-5" />} color="amber" />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { to: '/admin/milk-entry', icon: Milk, label: 'दूध एंट्री', color: 'bg-brand-500' },
+          { to: '/admin/customers', icon: Users, label: 'ग्राहक जोड़ें', color: 'bg-blue-500' },
+          { to: '/admin/payments', icon: TrendingUp, label: 'भुगतान दर्ज', color: 'bg-purple-500' },
+        ].map((item) => (
+          <Link key={item.to} to={item.to}>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              className={`${item.color} rounded-2xl p-4 text-white text-center shadow-sm`}>
+              <item.icon className="w-6 h-6 mx-auto mb-2" />
+              <p className="text-xs font-semibold">{item.label}</p>
+            </motion.div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Milk Trend Chart */}
+      {milkTrend.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>दूध की प्रवृत्ति (पिछले 7 दिन)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={milkTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0fdf4" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v: any) => [`${v} L`]} />
+                <Line type="monotone" dataKey="morning" stroke="#34d399" name="सुबह" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="evening" stroke="#818cf8" name="शाम" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="total" stroke="#10b981" name="कुल" strokeWidth={2.5} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Top Debtors */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>बकाया ग्राहक</CardTitle>
+              <Link to="/admin/customers" className="text-xs text-brand-600 hover:underline flex items-center gap-1">
+                सभी देखें <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!dash?.topDebtors?.length ? (
+              <p className="text-sm text-gray-400 text-center py-4">🎉 कोई बकाया नहीं!</p>
+            ) : (
+              dash.topDebtors.map((c: any) => (
+                <Link key={c._id} to={`/admin/customers/${c._id}`}>
+                  <div className="flex items-center justify-between py-2 hover:bg-gray-50 rounded-lg px-2 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 text-xs font-bold">
+                        {c.fullName[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{c.fullName}</p>
+                        <p className="text-xs text-gray-400">{c.customerId}</p>
+                      </div>
+                    </div>
+                    <Badge variant="danger">₹{c.currentBalance.toLocaleString('en-IN')}</Badge>
+                  </div>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Entries */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>हाल की एंट्री</CardTitle>
+              <Link to="/admin/milk-entry" className="text-xs text-brand-600 hover:underline flex items-center gap-1">
+                एंट्री करें <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!dash?.recentEntries?.length ? (
+              <EmptyState title="कोई एंट्री नहीं" description="आज की दूध एंट्री शुरू करें" action={{ label: 'एंट्री करें', onClick: () => {} }} />
+            ) : (
+              dash.recentEntries.map((r: any) => (
+                <div key={r._id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
+                      <Milk className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{(r.customerId as any)?.fullName || '—'}</p>
+                      <p className="text-xs text-gray-400">{formatDate(r.date)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-brand-700">{formatQuantity(r.totalQty)}</p>
+                    <p className="text-xs text-gray-400">{formatCurrency(r.amount)}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
