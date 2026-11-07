@@ -7,7 +7,8 @@
     "dev": "nodemon --exec ts-node src/app.ts",
     "build": "tsc",
     "start": "node dist/src/app.js",
-    "seed": "node dist/seeds/seed.js"
+    "seed": "node dist/seeds/seed.js",
+    "clean-duplicates": "node scripts/cleanDuplicates.js"
   },
   "keywords": [
     "dairy",
