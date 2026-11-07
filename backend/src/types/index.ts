@@ -15,9 +15,10 @@ export interface JwtPayload {
   customerId?: string;
 }
 
-export interface AuthRequest extends Request {
+export type AuthRequest = Request & {
   user?: JwtPayload;
-}
+  [key: string]: any;
+};
 
 export interface PaginationQuery {
   page?: string;
