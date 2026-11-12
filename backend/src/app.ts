@@ -32,14 +32,10 @@ const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:5173', 'http://local
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.onrender.com') ||
-      /^https?:\/\/localhost(:[0-9]+)?$/.test(origin)
-    ) {
+    if (allowedOrigins.includes(origin) || (env.NODE_ENV !== 'production' && /^https?:\/\/localhost(:[0-9]+)?$/.test(origin))) {
       return callback(null, true);
     }
-    return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

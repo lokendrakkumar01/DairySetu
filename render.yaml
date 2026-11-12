@@ -35,7 +35,7 @@ services:
     buildCommand: npm install --include=dev && npm run build
     staticPublishPath: dist
     envVars:
-      - key: VITE_API_URL
+      - key: VITE_API_BASE_URL
         value: https://dairysetu-api.onrender.com
       - key: VITE_APP_NAME
         value: DairySetu

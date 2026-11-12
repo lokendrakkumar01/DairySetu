@@ -76,7 +76,8 @@ export async function getBill(req: AuthRequest, res: Response): Promise<void> {
 
   if (!bill) { sendError(res, 'Bill not found', 404); return; }
 
-  if (req.user.role === 'customer' && bill.customerId.toString() !== req.user.customerId) {
+  const billCustomerId = (bill.customerId as unknown as { _id?: Types.ObjectId })._id || bill.customerId;
+  if (req.user.role === 'customer' && billCustomerId.toString() !== req.user.customerId) {
     sendError(res, 'Access denied', 403); return;
   }
 

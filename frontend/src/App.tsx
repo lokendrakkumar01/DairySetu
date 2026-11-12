@@ -1,25 +1,26 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import AdminLayout from '@/layouts/AdminLayout'
-import CustomerLayout from '@/layouts/CustomerLayout'
-import AdminLogin from '@/pages/auth/AdminLogin'
-import AdminRegister from '@/pages/auth/AdminRegister'
-import CustomerLogin from '@/pages/auth/CustomerLogin'
-import Dashboard from '@/pages/admin/Dashboard'
-import Customers from '@/pages/admin/Customers'
-import CustomerDetail from '@/pages/admin/CustomerDetail'
-import MilkEntry from '@/pages/admin/MilkEntry'
-import Bills from '@/pages/admin/Bills'
-import BillDetail from '@/pages/admin/BillDetail'
-import Payments from '@/pages/admin/Payments'
-import Analytics from '@/pages/admin/Analytics'
-import Rates from '@/pages/admin/Rates'
-import Settings from '@/pages/admin/Settings'
-import CustomerDashboard from '@/pages/customer/CustomerDashboard'
-import MilkHistory from '@/pages/customer/MilkHistory'
-import MyBills from '@/pages/customer/MyBills'
-import MyPayments from '@/pages/customer/MyPayments'
-import MyProfile from '@/pages/customer/MyProfile'
+const AdminLayout = lazy(() => import('@/layouts/AdminLayout'))
+const CustomerLayout = lazy(() => import('@/layouts/CustomerLayout'))
+const AdminLogin = lazy(() => import('@/pages/auth/AdminLogin'))
+const AdminRegister = lazy(() => import('@/pages/auth/AdminRegister'))
+const CustomerLogin = lazy(() => import('@/pages/auth/CustomerLogin'))
+const Dashboard = lazy(() => import('@/pages/admin/Dashboard'))
+const Customers = lazy(() => import('@/pages/admin/Customers'))
+const CustomerDetail = lazy(() => import('@/pages/admin/CustomerDetail'))
+const MilkEntry = lazy(() => import('@/pages/admin/MilkEntry'))
+const Bills = lazy(() => import('@/pages/admin/Bills'))
+const BillDetail = lazy(() => import('@/pages/admin/BillDetail'))
+const Payments = lazy(() => import('@/pages/admin/Payments'))
+const Analytics = lazy(() => import('@/pages/admin/Analytics'))
+const Rates = lazy(() => import('@/pages/admin/Rates'))
+const Settings = lazy(() => import('@/pages/admin/Settings'))
+const CustomerDashboard = lazy(() => import('@/pages/customer/CustomerDashboard'))
+const MilkHistory = lazy(() => import('@/pages/customer/MilkHistory'))
+const MyBills = lazy(() => import('@/pages/customer/MyBills'))
+const MyPayments = lazy(() => import('@/pages/customer/MyPayments'))
+const MyProfile = lazy(() => import('@/pages/customer/MyProfile'))
 import { PageLoader } from '@/components/ui/loading-spinner'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ function CustomerGuard({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -88,5 +90,6 @@ export default function App() {
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/admin/login" replace />} />
     </Routes>
+    </Suspense>
   )
 }

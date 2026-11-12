@@ -4,8 +4,12 @@ import { AuthRequest } from '../types';
 import { sendSuccess, sendError } from '../utils/responseHelper';
 import DairyAccount from '../models/DairyAccount';
 import Customer from '../models/Customer';
+import User from '../models/User';
 import MilkRecord from '../models/MilkRecord';
 import Payment from '../models/Payment';
+import MonthlyBill from '../models/MonthlyBill';
+import Adjustment from '../models/Adjustment';
+import Notification from '../models/Notification';
 import { startOfDay, endOfDay, getMonthRange } from '../utils/dateUtils';
 import { z } from 'zod';
 
@@ -99,4 +103,29 @@ export async function updateProfile(req: AuthRequest, res: Response): Promise<vo
   );
   if (!dairy) { sendError(res, 'Dairy not found', 404); return; }
   sendSuccess(res, dairy, 'Profile updated');
+}
+
+export async function cleanDairyData(req: AuthRequest, res: Response): Promise<void> {
+  if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
+  const confirmation = z.object({ confirmation: z.literal('DELETE ALL DAIRY DATA') }).safeParse(req.body);
+  if (!confirmation.success) {
+    sendError(res, 'To permanently delete dairy records, provide confirmation: DELETE ALL DAIRY DATA', 400);
+    return;
+  }
+  const dairyId = new Types.ObjectId(req.user.dairyId);
+
+  const customers = await Customer.find({ dairyId });
+  const userIds = customers.map(c => c.userId).filter(Boolean);
+
+  await Promise.all([
+    MilkRecord.deleteMany({ dairyId }),
+    Payment.deleteMany({ dairyId }),
+    MonthlyBill.deleteMany({ dairyId }),
+    Adjustment.deleteMany({ dairyId }),
+    Notification.deleteMany({ dairyId, userId: { $in: userIds } }),
+    Customer.deleteMany({ dairyId }),
+    User.deleteMany({ _id: { $in: userIds } }),
+  ]);
+
+  sendSuccess(res, null, 'सभी पुराने रिकॉर्ड और ग्राहक साफ़ कर दिए गए (Cleaned successfully)');
 }

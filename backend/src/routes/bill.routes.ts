@@ -18,6 +18,6 @@ router.post('/generate', requireAdmin, generateBillHandler);
 router.get('/:id', getBill);
 router.post('/:id/finalize', requireAdmin, finalizeBillHandler);
 router.post('/:id/close', requireAdmin, closeBillHandler);
-router.get('/:id/pdf-data', getBillPdfData);
+router.get('/:id/pdf-data', requireAdmin, getBillPdfData);
 
 export default router;
