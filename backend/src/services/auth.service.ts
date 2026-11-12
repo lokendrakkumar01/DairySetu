@@ -177,15 +177,15 @@ export async function loginCustomer(
     query.dairyId = new Types.ObjectId(dairyId);
   }
 
-  const user = await User.findOne(query).populate('customerId');
-  if (!user) {
-    const err = new Error('Invalid credentials') as Error & { statusCode: number };
-    err.statusCode = 401;
-    throw err;
+  const candidates = await User.find(query).limit(dairyId ? 1 : 50);
+  let user: (typeof candidates)[number] | null = null;
+  for (const candidate of candidates) {
+    if (await comparePassword(password, candidate.passwordHash)) {
+      user = candidate;
+      break;
+    }
   }
-
-  const valid = await comparePassword(password, user.passwordHash);
-  if (!valid) {
+  if (!user) {
     const err = new Error('Invalid credentials') as Error & { statusCode: number };
     err.statusCode = 401;
     throw err;

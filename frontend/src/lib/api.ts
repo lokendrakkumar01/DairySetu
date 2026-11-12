@@ -57,3 +57,13 @@ api.interceptors.response.use(
 
 export { api }
 export default api
+
+export async function revokeSession(token: string) {
+  if (!token) return
+  try {
+    const { data } = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken: token })
+    await axios.post(`${BASE_URL}/api/auth/logout`, null, { headers: { Authorization: `Bearer ${data.data.accessToken}` } })
+  } catch {
+    // Clearing the local session must still work when the API is offline.
+  }
+}

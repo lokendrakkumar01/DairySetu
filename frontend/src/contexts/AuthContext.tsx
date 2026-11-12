@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { User, Dairy, AuthTokens } from '@/types'
+import { revokeSession } from '@/lib/api'
 
 interface AuthState {
   user: User | null
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    void revokeSession(localStorage.getItem('refreshToken') || '')
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')

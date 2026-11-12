@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -19,8 +19,12 @@ type FormData = z.infer<typeof schema>
 
 export default function AdminLogin() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, isAuthenticated, isAdmin, isCustomer } = useAuth()
   const [showPass, setShowPass] = useState(false)
+
+  useEffect(() => {
+    if (isAuthenticated) navigate(isAdmin ? '/admin/dashboard' : isCustomer ? '/customer/dashboard' : '/', { replace: true })
+  }, [isAuthenticated, isAdmin, isCustomer, navigate])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema)
@@ -66,7 +70,7 @@ export default function AdminLogin() {
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">Admin Login</h2>
-          <p className="text-sm text-gray-500 mb-6">अपने डेयरी खाते में लॉगिन करें</p>
+          <p className="text-sm text-gray-500 mb-6">अपने डेयरी खाते में लॉगिन करें। इस डिवाइस पर लॉगआउट तक साइन-इन बना रहेगा।</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>

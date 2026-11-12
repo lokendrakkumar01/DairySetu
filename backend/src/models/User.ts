@@ -32,5 +32,6 @@ const UserSchema = new Schema<IUser>(
 
 // Compound unique index: username unique per dairy
 UserSchema.index({ dairyId: 1, username: 1 }, { unique: true });
+UserSchema.index({ username: 1, role: 1, isActive: 1 });
 
 export default mongoose.model<IUser>('User', UserSchema);

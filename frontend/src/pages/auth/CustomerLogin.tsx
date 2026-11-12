@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,8 +18,12 @@ type FormData = z.infer<typeof schema>
 
 export default function CustomerLogin() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, isAuthenticated, isAdmin, isCustomer } = useAuth()
   const [showPass, setShowPass] = useState(false)
+
+  useEffect(() => {
+    if (isAuthenticated) navigate(isAdmin ? '/admin/dashboard' : isCustomer ? '/customer/dashboard' : '/', { replace: true })
+  }, [isAuthenticated, isAdmin, isCustomer, navigate])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema)
@@ -90,7 +94,7 @@ export default function CustomerLogin() {
 
           <div className="mt-5 p-3 bg-brand-50 rounded-xl">
             <p className="text-xs text-brand-700 font-medium">💡 नोट:</p>
-            <p className="text-xs text-brand-600 mt-1">आपका Customer ID और Password आपके मिल्कमैन से प्राप्त करें।</p>
+            <p className="text-xs text-brand-600 mt-1">अपना Username और Password डेयरी एडमिन से लें। इस डिवाइस पर लॉगिन करने के बाद आप लॉगआउट तक सीधे वापस आ सकेंगे।</p>
           </div>
 
           <p className="text-center text-sm text-gray-500 mt-4">

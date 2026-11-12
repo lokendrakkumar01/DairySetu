@@ -50,7 +50,9 @@ export async function createCustomer(
   // Create user account for customer
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
-  const username = `${customerId.toLowerCase()}`;
+  // Keep the visible dairy customer ID short while making the login name
+  // distinct across dairies, where IDs such as DS001 are reused.
+  const username = `${customerId.toLowerCase()}-${dairyObjectId.toString().slice(-8)}`;
 
   const user = await User.create({
     dairyId: dairyObjectId,
@@ -106,7 +108,7 @@ export async function softDeleteCustomer(
 export async function resetCustomerPassword(
   customerId: string,
   dairyId: string
-): Promise<string> {
+): Promise<{ temporaryPassword: string; username: string }> {
   const customer = await Customer.findOne({
     _id: customerId,
     dairyId: new Types.ObjectId(dairyId),
@@ -127,6 +129,11 @@ export async function resetCustomerPassword(
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
 
-  await User.findByIdAndUpdate(customer.userId, { passwordHash });
-  return tempPassword;
+  const user = await User.findByIdAndUpdate(customer.userId, { $set: { passwordHash }, $unset: { refreshToken: 1 } }, { new: true });
+  if (!user) {
+    const err = new Error('Customer login account not found') as Error & { statusCode: number };
+    err.statusCode = 404;
+    throw err;
+  }
+  return { temporaryPassword: tempPassword, username: user.username };
 }

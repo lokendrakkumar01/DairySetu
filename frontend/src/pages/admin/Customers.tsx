@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Phone, MapPin, Wallet, Edit2, MoreVertical, UserCheck, UserX, Key } from 'lucide-react'
+import { Search, Plus, Phone, MapPin, Wallet, Edit2, MoreVertical, UserCheck, UserX, Key, Copy, MessageCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useAuth } from '@/contexts/AuthContext'
 
 const customerSchema = z.object({
   fullName: z.string().min(2, 'Name required'),
@@ -32,10 +33,11 @@ function fetchCustomers(search: string, status: string) {
 
 export default function Customers() {
   const qc = useQueryClient()
+  const { dairy } = useAuth()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [showAdd, setShowAdd] = useState(false)
-  const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string; customerId: string } | null>(null)
+  const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string; customerId: string; mobile: string; dairyName: string } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', search, status],
@@ -51,7 +53,7 @@ export default function Customers() {
     mutationFn: (body: CustomerForm) => api.post('/api/customers', body),
     onSuccess: (res) => {
       const d = res.data.data
-      setCreatedCreds({ username: d.username, password: d.tempPassword, customerId: d.customerId })
+      setCreatedCreds({ username: d.username, password: d.tempPassword, customerId: d.customerId, mobile: d.customer.mobile, dairyName: dairy?.dairyName || 'DairySetu' })
       qc.invalidateQueries({ queryKey: ['customers'] })
       toast.success('ग्राहक जोड़ा गया!')
       reset()
@@ -61,6 +63,15 @@ export default function Customers() {
   })
 
   const customers = data?.data || []
+
+  const shareCredentials = async () => {
+    if (!createdCreds) return
+    const message = `Namaste! ${createdCreds.dairyName} ke customer portal par login karne ke liye:\nCustomer ID: ${createdCreds.customerId}\nUsername: ${createdCreds.username}\nPassword: ${createdCreds.password}\nLogin: ${window.location.origin}/customer/login\n\nIs message ko surakshit rakhein.`
+    const digits = createdCreds.mobile.replace(/\D/g, '')
+    const localNumber = digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits
+    const phone = localNumber.length === 10 ? `91${localNumber}` : localNumber
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <div className="p-4 lg:p-6">
@@ -220,8 +231,12 @@ export default function Customers() {
                   <span className="font-mono font-bold text-orange-600">{createdCreds.password}</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 text-center mt-3">ग्राहक पहली बार login करके password बदल सकते हैं</p>
-              <Button className="w-full mt-4" onClick={() => setCreatedCreds(null)}>ठीक है</Button>
+              <p className="text-xs text-gray-400 text-center mt-3">यह पासवर्ड सिर्फ़ अभी दिखेगा। इसे ग्राहक को भेजें; भूलने पर नया पासवर्ड बनाया जा सकता है।</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(`Customer ID: ${createdCreds.customerId}\nUsername: ${createdCreds.username}\nPassword: ${createdCreds.password}`); toast.success('Credentials copied') } catch { toast.error('Copy is unavailable in this browser') } }}><Copy className="h-4 w-4" />Copy</Button>
+                <Button onClick={shareCredentials} className="bg-green-600 hover:bg-green-700"><MessageCircle className="h-4 w-4" />WhatsApp</Button>
+              </div>
+              <Button className="w-full mt-2" variant="ghost" onClick={() => setCreatedCreds(null)}>ठीक है</Button>
             </motion.div>
           </div>
         )}

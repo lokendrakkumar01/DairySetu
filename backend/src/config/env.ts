@@ -9,6 +9,6 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || 'fallback_secret_change_in_prod',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m',
-  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '3650d',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
 };

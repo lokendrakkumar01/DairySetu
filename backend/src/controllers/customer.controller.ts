@@ -106,7 +106,7 @@ export async function createCustomerHandler(req: AuthRequest, res: Response): Pr
     },
     req.user.userId
   );
-  sendSuccess(res, result, 'Customer registered successfully', 201);
+  sendSuccess(res, { ...result, dairyCode: req.user.dairyId }, 'Customer registered successfully', 201);
 }
 
 export async function getCustomer(req: AuthRequest, res: Response): Promise<void> {
@@ -170,8 +170,8 @@ export async function deleteCustomerHandler(req: AuthRequest, res: Response): Pr
 export async function resetPassword(req: AuthRequest, res: Response): Promise<void> {
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
   const id = req.params.id as string;
-  const tempPassword = await resetCustomerPassword(id, req.user.dairyId);
-  sendSuccess(res, { tempPassword }, 'Password reset successfully');
+  const credentials = await resetCustomerPassword(id, req.user.dairyId);
+  sendSuccess(res, credentials, 'Password reset successfully');
 }
 
 export async function getCustomerStatement(req: AuthRequest, res: Response): Promise<void> {

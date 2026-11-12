@@ -41,11 +41,17 @@ function CustomerGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function HomeRedirect() {
+  const { isAuthenticated, isAdmin, isCustomer } = useAuth()
+  if (isAuthenticated) return <Navigate to={isAdmin ? '/admin/dashboard' : isCustomer ? '/customer/dashboard' : '/admin/login'} replace />
+  return <Navigate to="/admin/login" replace />
+}
+
 export default function App() {
   return (
     <Suspense fallback={<PageLoader />}>
     <Routes>
-      <Route path="/" element={<Navigate to="/admin/login" replace />} />
+      <Route path="/" element={<HomeRedirect />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/register" element={<AdminRegister />} />
       <Route path="/customer/login" element={<CustomerLogin />} />

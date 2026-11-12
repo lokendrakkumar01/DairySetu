@@ -1,15 +1,28 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Phone, MapPin, Milk, Wallet } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { ArrowLeft, Phone, MapPin, Milk, Wallet, KeyRound, Copy, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/loading-spinner'
 import { formatCurrency, formatDate, formatQuantity } from '@/lib/utils'
 import api from '@/lib/api'
+import toast from 'react-hot-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>()
+  const { dairy } = useAuth()
+  const queryClient = useQueryClient()
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+
+  const resetPassword = useMutation({
+    mutationFn: async () => (await api.post(`/api/customers/${id}/reset-password`)).data.data as { temporaryPassword: string; username: string },
+    onSuccess: credentials => { setTemporaryPassword(`${credentials.username}\n${credentials.temporaryPassword}`); setSharing(true); toast.success('New temporary password created') },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Could not reset password'),
+  })
 
   const { data: customerData, isLoading } = useQuery({
     queryKey: ['customer', id],
@@ -61,6 +74,13 @@ export default function CustomerDetail() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-sm font-semibold text-gray-900">Customer app access</p><p className="mt-1 text-xs text-gray-500">Reset creates a new password and signs out the old customer session.</p></div>
+          <Button variant="outline" loading={resetPassword.isPending} onClick={() => resetPassword.mutate()} className="shrink-0"><KeyRound className="h-4 w-4" />Create new password</Button>
         </CardContent>
       </Card>
 
@@ -141,6 +161,18 @@ export default function CustomerDetail() {
           </CardContent>
         </Card>
       )}
+
+      {sharing && temporaryPassword && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="mb-4 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><KeyRound className="h-6 w-6" /></div><h2 className="font-bold text-gray-900">Share customer login</h2><p className="mt-1 text-xs text-gray-500">Send this new password directly to {c.fullName}.</p></div>
+          <div className="space-y-2 rounded-xl bg-emerald-50 p-4 text-sm"><p>Customer ID: <strong>{c.customerId}</strong></p><p>Username: <strong>{temporaryPassword.split('\n')[0]}</strong></p><p>Temporary password: <strong className="font-mono text-orange-700">{temporaryPassword.split('\n')[1]}</strong></p></div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(`Customer ID: ${c.customerId}\nUsername: ${temporaryPassword.split('\n')[0]}\nPassword: ${temporaryPassword.split('\n')[1]}`); toast.success('Credentials copied') } catch { toast.error('Copy is unavailable in this browser') } }}><Copy className="h-4 w-4" />Copy</Button>
+            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { const digits = c.mobile.replace(/\D/g, ''); const localNumber = digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits; const phone = localNumber.length === 10 ? `91${localNumber}` : localNumber; const message = `Namaste ${c.fullName}! ${dairy?.dairyName || 'DairySetu'} customer portal login:\nCustomer ID: ${c.customerId}\nUsername: ${temporaryPassword.split('\n')[0]}\nPassword: ${temporaryPassword.split('\n')[1]}\nLogin: ${window.location.origin}/customer/login`; window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer') }}><MessageCircle className="h-4 w-4" />WhatsApp</Button>
+          </div>
+          <Button variant="ghost" className="mt-2 w-full" onClick={() => { setSharing(false); setTemporaryPassword(null); queryClient.invalidateQueries({ queryKey: ['customer', id] }) }}>Done</Button>
+        </div>
+      </div>}
     </div>
   )
 }
