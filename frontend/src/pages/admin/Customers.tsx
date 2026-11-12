@@ -82,6 +82,15 @@ export default function Customers() {
     onError: (err: any) => toast.error(err.response?.data?.message || 'Could not update customer'),
   })
 
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (customer: any) => api.delete(`/api/customers/${customer._id}`, { params: { permanent: 'true' } }),
+    onSuccess: (_res, customer) => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      toast.success(`${customer.fullName} permanently deleted`)
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Could not permanently delete customer'),
+  })
+
   const customers = data?.data || []
 
   const openEdit = (customer: any) => {
@@ -176,7 +185,10 @@ export default function Customers() {
                       <span className="text-xs text-gray-400 capitalize">{c.milkType} milk</span>
                       <div className="mt-1 flex gap-1">
                         <Button type="button" size="sm" variant="outline" className="h-8 px-2" aria-label={`Edit ${c.fullName}`} onClick={() => openEdit(c)}><Edit2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Edit</span></Button>
-                        {c.isActive ? <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-red-600 hover:bg-red-50" aria-label={`Delete ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => { if (window.confirm(`Deactivate ${c.fullName}? Their milk and billing history will be preserved.`)) statusMutation.mutate({ customer: c, activate: false }) }}><Trash2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Delete</span></Button> : <Button type="button" size="sm" variant="outline" className="h-8 px-2" aria-label={`Restore ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ customer: c, activate: true })}><RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline">Restore</span></Button>}
+                        {c.isActive ? <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-red-600 hover:bg-red-50" aria-label={`Delete ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => { if (window.confirm(`Deactivate ${c.fullName}? Their milk and billing history will be preserved.`)) statusMutation.mutate({ customer: c, activate: false }) }}><Trash2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Delete</span></Button> : <>
+                          <Button type="button" size="sm" variant="outline" className="h-8 px-2" aria-label={`Restore ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ customer: c, activate: true })}><RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline">Restore</span></Button>
+                          <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-red-600 hover:bg-red-50" aria-label={`Permanently delete ${c.fullName}`} disabled={permanentDeleteMutation.isPending} onClick={() => { if (window.confirm(`Permanently delete ${c.fullName} and their milk collection data? This cannot be undone. Customers with payment, bill, or adjustment history are protected.`)) permanentDeleteMutation.mutate(c) }}><Trash2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Permanent</span></Button>
+                        </>}
                       </div>
                     </div>
                   </div>
