@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Droplets, TrendingUp, AlertCircle, Milk, Moon, Sun, ArrowRight, FlaskConical } from 'lucide-react'
+import { Users, Droplets, TrendingUp, AlertCircle, Milk, Moon, Sun, ArrowRight, FlaskConical, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { PageLoader } from '@/components/ui/loading-spinner'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,7 +17,8 @@ import {
 } from 'recharts'
 
 async function fetchDashboard() {
-  const res = await api.get('/api/admin/dashboard')
+  // Render may need time to wake the API after a period with no traffic.
+  const res = await api.get('/api/admin/dashboard', { timeout: 60000 })
   return res.data.data
 }
 
@@ -36,12 +39,20 @@ async function fetchProcurementToday() {
 
 export default function Dashboard() {
   const { dairy, user } = useAuth()
+  const [showingLoadHint, setShowingLoadHint] = useState(false)
 
-  const { data: dash, isLoading } = useQuery({
+  const { data: dash, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn: fetchDashboard,
     refetchInterval: 60000,
+    retry: 0,
   })
+
+  useEffect(() => {
+    if (!isLoading) { setShowingLoadHint(false); return }
+    const timer = window.setTimeout(() => setShowingLoadHint(true), 8000)
+    return () => window.clearTimeout(timer)
+  }, [isLoading])
 
   const { data: analytics } = useQuery({
     queryKey: ['analytics-7d'],
@@ -53,7 +64,24 @@ export default function Dashboard() {
     refetchInterval: 60000,
   })
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return (
+    <div className="flex min-h-[55vh] flex-col items-center justify-center px-5 text-center">
+      <LoadingSpinner size="lg" />
+      <p className="mt-3 text-sm font-medium text-slate-600">Dashboard लोड हो रहा है…</p>
+      <p className="mt-1 max-w-sm text-xs text-slate-400">{showingLoadHint ? 'Server कुछ समय से बंद था तो उसे शुरू होने में एक मिनट लग सकता है। कृपया यह पेज खुला रखें।' : 'आपका आज का सारांश तैयार हो रहा है।'}</p>
+    </div>
+  )
+
+  if (isError && !dash) return (
+    <div className="flex min-h-[55vh] flex-col items-center justify-center px-5 text-center">
+      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600"><RefreshCw className="h-5 w-5" /></div>
+        <h1 className="mt-4 text-lg font-semibold text-slate-900">Dashboard अभी लोड नहीं हुआ</h1>
+        <p className="mt-2 text-sm text-slate-500">Internet check करें और दोबारा कोशिश करें। Server को शुरू होने में समय लगा हो सकता है।</p>
+        <Button className="mt-5" loading={isFetching} onClick={() => refetch()}><RefreshCw className="h-4 w-4" /> फिर कोशिश करें</Button>
+      </div>
+    </div>
+  )
 
   const milkTrend = analytics?.dailyMilkTrend?.slice(-7) || []
 
