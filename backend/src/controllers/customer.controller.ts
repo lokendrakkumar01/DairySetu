@@ -132,6 +132,16 @@ export async function updateCustomerHandler(req: AuthRequest, res: Response): Pr
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
   const id = req.params.id as string;
   const body = UpdateCustomerSchema.parse(req.body);
+  if (body.mobile) {
+    const dairyId = new Types.ObjectId(req.user.dairyId);
+    const existingCustomer = await Customer.findOne({ _id: id, dairyId });
+    if (!existingCustomer) { sendError(res, 'Customer not found', 404); return; }
+    const duplicateCustomer = await Customer.exists({ dairyId, mobile: body.mobile, _id: { $ne: existingCustomer._id } });
+    if (duplicateCustomer) { sendError(res, 'Another customer already uses this mobile number', 409); return; }
+    const normalizedMobile = body.mobile.replace(/\D/g, '');
+    const duplicateLogin = await User.exists({ dairyId, username: normalizedMobile, _id: { $ne: existingCustomer.userId } });
+    if (duplicateLogin) { sendError(res, 'This mobile number is already used for another login in this dairy', 409); return; }
+  }
   const customer = await updateCustomer(id, req.user.dairyId, body);
   if (!customer) { sendError(res, 'Customer not found', 404); return; }
   sendSuccess(res, customer, 'Customer updated successfully');

@@ -85,6 +85,15 @@ export async function updateCustomer(
     { $set: payload },
     { new: true, runValidators: true }
   );
+  if (customer?.userId && (payload.mobile || payload.isActive !== undefined)) {
+    const userUpdate: Record<string, unknown> = {};
+    if (payload.mobile) userUpdate.username = payload.mobile.replace(/\D/g, '');
+    if (payload.isActive !== undefined) userUpdate.isActive = payload.isActive;
+    await User.findOneAndUpdate(
+      { _id: customer.userId, dairyId: new Types.ObjectId(dairyId) },
+      { $set: userUpdate }
+    );
+  }
   return customer;
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Phone, MapPin, Wallet, Edit2, MoreVertical, UserCheck, UserX, Key, Copy, MessageCircle } from 'lucide-react'
+import { Search, Plus, Phone, MapPin, Edit2, Trash2, RotateCcw, Key, Copy, MessageCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 const customerSchema = z.object({
   fullName: z.string().min(2, 'Name required'),
   mobile: z.string().min(10, 'Valid mobile required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().optional().refine(value => !value || value.length >= 6, 'Password must be at least 6 characters'),
   village: z.string().optional(),
   address: z.string().optional(),
   milkType: z.enum(['cow', 'buffalo', 'mixed']).default('mixed'),
@@ -38,6 +38,7 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<any>(null)
   const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string; customerId: string; mobile: string; dairyName: string } | null>(null)
 
   const { data, isLoading } = useQuery({
@@ -50,9 +51,16 @@ export default function Customers() {
     resolver: zodResolver(customerSchema)
   })
 
-  const createMutation = useMutation({
-    mutationFn: (body: CustomerForm) => api.post('/api/customers', body),
-    onSuccess: (res) => {
+  const saveMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string | null; body: CustomerForm }) => id ? api.put(`/api/customers/${id}`, body) : api.post('/api/customers', body),
+    onSuccess: (res, variables) => {
+      if (variables.id) {
+        qc.invalidateQueries({ queryKey: ['customers'] })
+        qc.invalidateQueries({ queryKey: ['customer', variables.id] })
+        toast.success('ग्राहक की जानकारी अपडेट हुई')
+        reset(); setShowAdd(false); setEditingCustomer(null)
+        return
+      }
       const d = res.data.data
       setCreatedCreds({ username: d.username, password: d.tempPassword, customerId: d.customerId, mobile: d.customer.mobile, dairyName: dairy?.dairyName || 'DairySetu' })
       qc.invalidateQueries({ queryKey: ['customers'] })
@@ -60,10 +68,32 @@ export default function Customers() {
       reset()
       setShowAdd(false)
     },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed'),
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to save customer'),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: ({ customer, activate }: { customer: any; activate: boolean }) => activate
+      ? api.put(`/api/customers/${customer._id}`, { isActive: true })
+      : api.delete(`/api/customers/${customer._id}`),
+    onSuccess: (_res, { customer, activate }) => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      toast.success(activate ? 'Customer account restored' : `${customer.fullName} deactivated; account history is preserved`)
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Could not update customer'),
   })
 
   const customers = data?.data || []
+
+  const openEdit = (customer: any) => {
+    setEditingCustomer(customer)
+    reset({ fullName: customer.fullName, mobile: customer.mobile, password: '', village: customer.village || '', address: customer.address || '', milkType: customer.milkType, defaultMorningQty: customer.defaultMorningQty || 0, defaultEveningQty: customer.defaultEveningQty || 0 })
+    setShowAdd(true)
+  }
+  const submitCustomer = (body: CustomerForm) => {
+    if (!editingCustomer && !body.password) { toast.error('Customer login password required'); return }
+    saveMutation.mutate({ id: editingCustomer?._id || null, body })
+  }
+  const closeCustomerForm = () => { setShowAdd(false); setEditingCustomer(null); reset() }
 
   const shareCredentials = async () => {
     if (!createdCreds) return
@@ -82,7 +112,7 @@ export default function Customers() {
           <h1 className="text-xl font-bold text-gray-900">ग्राहक सूची</h1>
           <p className="text-sm text-gray-500">{customers.length} ग्राहक</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} size="sm">
+        <Button onClick={() => { setEditingCustomer(null); reset(); setShowAdd(true) }} size="sm">
           <Plus className="w-4 h-4" /> नया ग्राहक
         </Button>
       </div>
@@ -139,11 +169,15 @@ export default function Customers() {
                         </div>
                       </div>
                     </Link>
-                    <div className="flex flex-col items-end gap-1 ml-2">
-                      <span className={`text-sm font-bold ${c.currentBalance > 0 ? 'text-red-500' : 'text-brand-600'}`}>
+                    <div className="ml-2 flex shrink-0 flex-col items-end gap-1">
+                      <span className={`hidden text-sm font-bold sm:inline ${c.currentBalance > 0 ? 'text-red-500' : 'text-brand-600'}`}>
                         {c.currentBalance > 0 ? `₹${c.currentBalance.toLocaleString('en-IN')} बकाया` : '✓ क्लियर'}
                       </span>
                       <span className="text-xs text-gray-400 capitalize">{c.milkType} milk</span>
+                      <div className="mt-1 flex gap-1">
+                        <Button type="button" size="sm" variant="outline" className="h-8 px-2" aria-label={`Edit ${c.fullName}`} onClick={() => openEdit(c)}><Edit2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Edit</span></Button>
+                        {c.isActive ? <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-red-600 hover:bg-red-50" aria-label={`Delete ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => { if (window.confirm(`Deactivate ${c.fullName}? Their milk and billing history will be preserved.`)) statusMutation.mutate({ customer: c, activate: false }) }}><Trash2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Delete</span></Button> : <Button type="button" size="sm" variant="outline" className="h-8 px-2" aria-label={`Restore ${c.fullName}`} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ customer: c, activate: true })}><RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline">Restore</span></Button>}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -160,9 +194,9 @@ export default function Customers() {
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
               className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
               <div className="p-5 border-b border-gray-100">
-                <h2 className="font-bold text-gray-900">नया ग्राहक जोड़ें</h2>
+                <h2 className="font-bold text-gray-900">{editingCustomer ? 'ग्राहक जानकारी बदलें' : 'नया ग्राहक जोड़ें'}</h2>
               </div>
-              <form onSubmit={handleSubmit(d => createMutation.mutate(d))} className="p-5 space-y-4">
+              <form onSubmit={handleSubmit(submitCustomer)} className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">पूरा नाम *</label>
@@ -174,14 +208,18 @@ export default function Customers() {
                     <input {...register('mobile')} placeholder="9876543210" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
                     {errors.mobile && <p className="text-xs text-red-500 mt-1">{errors.mobile.message}</p>}
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Customer login password *</label>
+                  {!editingCustomer && <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Customer login password {editingCustomer ? '(leave blank to keep current)' : '*'}</label>
                     <input {...register('password')} type="password" autoComplete="new-password" placeholder="At least 6 characters" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
                     {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
-                  </div>
+                  </div>}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">गाँव</label>
                     <input {...register('village')} placeholder="Ramnagar" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">पता</label>
+                    <input {...register('address')} placeholder="पूरा पता (वैकल्पिक)" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">दूध प्रकार</label>
@@ -201,8 +239,8 @@ export default function Customers() {
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => { setShowAdd(false); reset() }} className="flex-1">रद्द करें</Button>
-                  <Button type="submit" loading={isSubmitting} className="flex-1">जोड़ें ✓</Button>
+                  <Button type="button" variant="outline" onClick={closeCustomerForm} className="flex-1">रद्द करें</Button>
+                  <Button type="submit" loading={isSubmitting || saveMutation.isPending} className="flex-1">{editingCustomer ? 'सेव करें' : 'जोड़ें ✓'}</Button>
                 </div>
               </form>
             </motion.div>

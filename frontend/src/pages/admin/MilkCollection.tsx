@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, Check, ChevronLeft, ChevronRight, Clock3, Droplets, FlaskConical, Pencil, RefreshCw, Search, Thermometer, UserRound, X } from 'lucide-react'
+import { Activity, Check, ChevronLeft, ChevronRight, Clock3, Droplets, FlaskConical, Pencil, RefreshCw, Search, Thermometer, Trash2, UserRound, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -62,6 +62,17 @@ export default function MilkCollection() {
       clearForm()
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'Could not save collection'),
+  })
+
+  const remove = useMutation({
+    mutationFn: (record: Procurement) => api.delete(`/api/milk-procurement/${record._id}`),
+    onSuccess: (_response, record) => {
+      qc.invalidateQueries({ queryKey: ['milk-procurement'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      if (editingId === record._id) clearForm()
+      toast.success('Collection entry deleted')
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Could not delete collection'),
   })
 
   const records = data?.records || []
@@ -232,7 +243,10 @@ export default function MilkCollection() {
                     return <article key={record._id} className="p-4 transition hover:bg-slate-50/70 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{customer?.fullName || legacySupplier?.fullName || 'Customer'} <span className="ml-1 text-xs font-normal text-slate-400">{customer?.customerId || legacySupplier?.supplierCode}</span></p><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" />{record.session === 'morning' ? 'Morning' : 'Evening'} · {record.milkType} milk · {record.receiptNumber}</p></div>
-                        {record.customerId && <Button variant="ghost" size="icon" aria-label="Edit collection" onClick={() => editRecord(record)}><Pencil className="h-4 w-4" /></Button>}
+                        <div className="flex shrink-0 gap-1">
+                          {record.customerId && <Button variant="ghost" size="icon" aria-label="Edit collection" onClick={() => editRecord(record)}><Pencil className="h-4 w-4" /></Button>}
+                          <Button variant="ghost" size="icon" aria-label="Delete collection" disabled={remove.isPending} className="text-rose-600 hover:bg-rose-50" onClick={() => { if (window.confirm(`Delete ${customer?.fullName || legacySupplier?.fullName || 'this'} milk collection entry (${record.quantityKg.toFixed(2)} kg, ${record.receiptNumber})? This cannot be undone.`)) remove.mutate(record) }}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
                         <Reading label="Quantity" value={`${record.quantityKg.toFixed(2)} kg`} />

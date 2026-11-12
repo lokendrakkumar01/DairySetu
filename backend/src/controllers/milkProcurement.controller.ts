@@ -72,9 +72,10 @@ export async function updateProcurement(req: AuthRequest, res: Response): Promis
   const dairyId = new Types.ObjectId(req.user.dairyId);
   const record = await MilkProcurement.findOne({ _id: req.params.id, dairyId });
   if (!record) { sendError(res, 'Collection record not found', 404); return; }
-  const customer = record.customerId ? await Customer.findOne({ _id: record.customerId, dairyId }) : null;
+  const targetCustomerId = data.customerId ? new Types.ObjectId(data.customerId) : record.customerId;
+  const customer = targetCustomerId ? await Customer.findOne({ _id: targetCustomerId, dairyId, isActive: true }) : null;
   const nextMilkType = data.milkType || record.milkType;
-  if (record.customerId && (!customer || (customer.milkType !== 'mixed' && customer.milkType !== nextMilkType))) { sendError(res, 'Customer is not registered for the selected milk type', 422); return; }
+  if (targetCustomerId && (!customer || (customer.milkType !== 'mixed' && customer.milkType !== nextMilkType))) { sendError(res, 'Customer is not registered for the selected milk type', 422); return; }
   const oldValue = { quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg: record.ratePerKg, qualityStatus: record.qualityStatus };
   Object.assign(record, data, data.collectionDate ? { collectionDate: dayDate(data.collectionDate) } : {});
   await record.save();
@@ -82,4 +83,28 @@ export async function updateProcurement(req: AuthRequest, res: Response): Promis
   await record.populate('customerId', 'customerId fullName mobile village milkType');
   await record.populate('supplierId', 'supplierCode fullName mobile village');
   sendSuccess(res, record, 'Collection record updated');
+}
+
+export async function deleteProcurement(req: AuthRequest, res: Response): Promise<void> {
+  if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
+  const dairyId = new Types.ObjectId(req.user.dairyId);
+  const record = await MilkProcurement.findOne({ _id: req.params.id, dairyId });
+  if (!record) { sendError(res, 'Collection record not found', 404); return; }
+  const oldValue = {
+    customerId: record.customerId,
+    supplierId: record.supplierId,
+    collectionDate: record.collectionDate,
+    session: record.session,
+    milkType: record.milkType,
+    quantityKg: record.quantityKg,
+    fatPercent: record.fatPercent,
+    snfPercent: record.snfPercent,
+    ratePerKg: record.ratePerKg,
+    amount: record.amount,
+    qualityStatus: record.qualityStatus,
+    receiptNumber: record.receiptNumber,
+  };
+  await MilkProcurement.deleteOne({ _id: record._id, dairyId });
+  await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_DELETED', entityType: 'MilkProcurement', entityId: record._id, oldValue, ip: req.ip });
+  sendSuccess(res, null, 'Milk collection record deleted');
 }
