@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext'
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', labelHi: 'डैशबोर्ड' },
   { to: '/admin/milk-entry', icon: Milk, label: 'Milk Collection', labelHi: 'दूध संग्रह' },
-  { to: '/admin/customer-supply', icon: Droplets, label: 'Customer Supply', labelHi: 'ग्राहक सप्लाई' },
   { to: '/admin/customers', icon: Users, label: 'Customers', labelHi: 'ग्राहक' },
   { to: '/admin/bills', icon: FileText, label: 'Bills', labelHi: 'बिल' },
   { to: '/admin/payments', icon: CreditCard, label: 'Payments', labelHi: 'भुगतान' },
