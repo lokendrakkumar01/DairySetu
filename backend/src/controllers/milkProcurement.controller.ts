@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { AuthRequest } from '../types';
-import Supplier from '../models/Supplier';
+import Customer from '../models/Customer';
 import MilkProcurement from '../models/MilkProcurement';
 import AuditLog from '../models/AuditLog';
 import { sendError, sendSuccess } from '../utils/responseHelper';
@@ -10,7 +10,7 @@ import { startOfDay, endOfDay } from '../utils/dateUtils';
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => !Number.isNaN(new Date(`${v}T00:00:00`).getTime()), 'Invalid collection date');
 const RecordSchema = z.object({
-  supplierId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  customerId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   collectionDate: DateOnly,
   session: z.enum(['morning', 'evening']),
   milkType: z.enum(['cow', 'buffalo']),
@@ -28,7 +28,7 @@ const dayDate = (date: string) => startOfDay(new Date(`${date}T00:00:00`));
 export async function listProcurements(req: AuthRequest, res: Response): Promise<void> {
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
   const dairyId = new Types.ObjectId(req.user.dairyId);
-  const { date, startDate, endDate, session, supplierId, page = '1', limit = '100' } = req.query as Record<string, string>;
+  const { date, startDate, endDate, session, customerId, page = '1', limit = '100' } = req.query as Record<string, string>;
   const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
   const limitNum = Math.min(200, Math.max(1, Number.parseInt(limit, 10) || 100));
   const query: Record<string, unknown> = { dairyId };
@@ -40,9 +40,9 @@ export async function listProcurements(req: AuthRequest, res: Response): Promise
     if (Object.keys(range).length) query.collectionDate = range;
   }
   if (session === 'morning' || session === 'evening') query.session = session;
-  if (supplierId && Types.ObjectId.isValid(supplierId)) query.supplierId = new Types.ObjectId(supplierId);
+  if (customerId && Types.ObjectId.isValid(customerId)) query.customerId = new Types.ObjectId(customerId);
   const [records, total, summary] = await Promise.all([
-    MilkProcurement.find(query).populate('supplierId', 'supplierCode fullName mobile village').sort({ collectionDate: -1, createdAt: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum),
+    MilkProcurement.find(query).populate('customerId', 'customerId fullName mobile village milkType').populate('supplierId', 'supplierCode fullName mobile village').sort({ collectionDate: -1, createdAt: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum),
     MilkProcurement.countDocuments(query),
     MilkProcurement.aggregate([
       { $match: query },
@@ -56,29 +56,30 @@ export async function createProcurement(req: AuthRequest, res: Response): Promis
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
   const data = RecordSchema.parse(req.body);
   const dairyId = new Types.ObjectId(req.user.dairyId);
-  const supplierId = new Types.ObjectId(data.supplierId);
-  const supplier = await Supplier.findOne({ _id: supplierId, dairyId, status: 'active' });
-  if (!supplier) { sendError(res, 'Active farmer not found in this dairy', 404); return; }
-  if (!supplier.milkTypes.includes(data.milkType)) { sendError(res, 'This farmer is not registered for the selected milk type', 422); return; }
-  const record = await MilkProcurement.create({ ...data, dairyId, supplierId, collectionDate: dayDate(data.collectionDate), receiptNumber: `COL-${Date.now()}-${new Types.ObjectId().toString().slice(-5).toUpperCase()}`, recordedBy: new Types.ObjectId(req.user.userId) });
-  await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_RECORDED', entityType: 'MilkProcurement', entityId: record._id, newValue: { supplierId, quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg: record.ratePerKg, amount: record.amount }, ip: req.ip });
-  await record.populate('supplierId', 'supplierCode fullName mobile village');
+  const customerId = new Types.ObjectId(data.customerId);
+  const customer = await Customer.findOne({ _id: customerId, dairyId, isActive: true });
+  if (!customer) { sendError(res, 'Active customer not found in this dairy', 404); return; }
+  if (customer.milkType !== 'mixed' && customer.milkType !== data.milkType) { sendError(res, `This customer is registered for ${customer.milkType} milk`, 422); return; }
+  const record = await MilkProcurement.create({ ...data, dairyId, customerId, collectionDate: dayDate(data.collectionDate), receiptNumber: `COL-${Date.now()}-${new Types.ObjectId().toString().slice(-5).toUpperCase()}`, recordedBy: new Types.ObjectId(req.user.userId) });
+  await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_RECORDED', entityType: 'MilkProcurement', entityId: record._id, newValue: { customerId, quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg: record.ratePerKg, amount: record.amount }, ip: req.ip });
+  await record.populate('customerId', 'customerId fullName mobile village milkType');
   sendSuccess(res, record, 'Milk collection saved', 201);
 }
 
 export async function updateProcurement(req: AuthRequest, res: Response): Promise<void> {
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
-  const data = RecordSchema.partial().omit({ supplierId: true }).parse(req.body);
+  const data = RecordSchema.partial().parse(req.body);
   const dairyId = new Types.ObjectId(req.user.dairyId);
   const record = await MilkProcurement.findOne({ _id: req.params.id, dairyId });
   if (!record) { sendError(res, 'Collection record not found', 404); return; }
-  const supplier = await Supplier.findOne({ _id: record.supplierId, dairyId });
+  const customer = record.customerId ? await Customer.findOne({ _id: record.customerId, dairyId }) : null;
   const nextMilkType = data.milkType || record.milkType;
-  if (!supplier || !supplier.milkTypes.includes(nextMilkType)) { sendError(res, 'Farmer is not registered for the selected milk type', 422); return; }
+  if (record.customerId && (!customer || (customer.milkType !== 'mixed' && customer.milkType !== nextMilkType))) { sendError(res, 'Customer is not registered for the selected milk type', 422); return; }
   const oldValue = { quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg: record.ratePerKg, qualityStatus: record.qualityStatus };
   Object.assign(record, data, data.collectionDate ? { collectionDate: dayDate(data.collectionDate) } : {});
   await record.save();
   await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_UPDATED', entityType: 'MilkProcurement', entityId: record._id, oldValue, newValue: data, ip: req.ip });
+  await record.populate('customerId', 'customerId fullName mobile village milkType');
   await record.populate('supplierId', 'supplierCode fullName mobile village');
   sendSuccess(res, record, 'Collection record updated');
 }

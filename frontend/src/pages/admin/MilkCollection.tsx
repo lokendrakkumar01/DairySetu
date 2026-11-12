@@ -7,18 +7,18 @@ import { Card, CardContent } from '@/components/ui/card'
 import api from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 
-type Supplier = { _id: string; supplierCode: string; fullName: string; mobile: string; village?: string; milkTypes: ('cow' | 'buffalo')[] }
+type Customer = { _id: string; customerId: string; fullName: string; mobile: string; village?: string; milkType: 'cow' | 'buffalo' | 'mixed' }
 type Procurement = {
-  _id: string; supplierId: Supplier | string; collectionDate: string; session: 'morning' | 'evening'; milkType: 'cow' | 'buffalo';
+  _id: string; customerId?: Customer | string; supplierId?: { _id: string; supplierCode: string; fullName: string; mobile: string; village?: string } | string; collectionDate: string; session: 'morning' | 'evening'; milkType: 'cow' | 'buffalo';
   quantityKg: number; fatPercent: number; snfPercent: number; temperatureC?: number; ratePerKg: number; amount: number; qualityStatus: 'accepted' | 'rejected'; receiptNumber: string
 }
-type FormState = { supplierId: string; collectionDate: string; session: 'morning' | 'evening'; milkType: 'cow' | 'buffalo'; quantityKg: string; fatPercent: string; snfPercent: string; temperatureC: string; ratePerKg: string; qualityStatus: 'accepted' | 'rejected'; notes: string }
+type FormState = { customerId: string; collectionDate: string; session: 'morning' | 'evening'; milkType: 'cow' | 'buffalo'; quantityKg: string; fatPercent: string; snfPercent: string; temperatureC: string; ratePerKg: string; qualityStatus: 'accepted' | 'rejected'; notes: string }
 
 const today = () => {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
-const blankForm = (): FormState => ({ supplierId: '', collectionDate: today(), session: new Date().getHours() < 12 ? 'morning' : 'evening', milkType: 'cow', quantityKg: '', fatPercent: '', snfPercent: '', temperatureC: '', ratePerKg: '', qualityStatus: 'accepted', notes: '' })
+const blankForm = (): FormState => ({ customerId: '', collectionDate: today(), session: new Date().getHours() < 12 ? 'morning' : 'evening', milkType: 'cow', quantityKg: '', fatPercent: '', snfPercent: '', temperatureC: '', ratePerKg: '', qualityStatus: 'accepted', notes: '' })
 const numberValue = (value: string) => value === '' ? 0 : Number(value)
 
 export default function MilkCollection() {
@@ -27,11 +27,11 @@ export default function MilkCollection() {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<FormState>(blankForm)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [supplierOpen, setSupplierOpen] = useState(false)
+  const [customerOpen, setCustomerOpen] = useState(false)
 
-  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<Supplier[]>({
-    queryKey: ['suppliers', 'active'],
-    queryFn: async () => (await api.get('/api/suppliers', { params: { status: 'active', limit: 100 } })).data.data,
+  const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
+    queryKey: ['customers', 'active', 'milk-collection'],
+    queryFn: async () => (await api.get('/api/customers', { params: { status: 'active', limit: 200 } })).data.data,
   })
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['milk-procurement', date],
@@ -66,17 +66,17 @@ export default function MilkCollection() {
 
   const records = data?.records || []
   const summary = data?.summary || { totalKg: 0, acceptedKg: 0, rejectedKg: 0, payable: 0, averageFat: 0, averageSnf: 0 }
-  const selectedSupplier = suppliers.find(supplier => supplier._id === form.supplierId)
-  const filteredSuppliers = useMemo(() => suppliers.filter(supplier =>
-    `${supplier.fullName} ${supplier.supplierCode} ${supplier.mobile} ${supplier.village || ''}`.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 8), [suppliers, search])
+  const selectedCustomer = customers.find(customer => customer._id === form.customerId)
+  const filteredCustomers = useMemo(() => customers.filter(customer =>
+    `${customer.fullName} ${customer.customerId} ${customer.mobile} ${customer.village || ''}`.toLowerCase().includes(search.toLowerCase())
+  ).slice(0, 8), [customers, search])
   const amount = form.qualityStatus === 'accepted' ? numberValue(form.quantityKg) * numberValue(form.ratePerKg) : 0
 
   function clearForm() {
     setForm(blankForm())
     setSearch('')
     setEditingId(null)
-    setSupplierOpen(false)
+    setCustomerOpen(false)
   }
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -85,9 +85,9 @@ export default function MilkCollection() {
   }
 
   function editRecord(record: Procurement) {
-    const supplierId = typeof record.supplierId === 'string' ? record.supplierId : record.supplierId._id
+    const customerId = record.customerId ? (typeof record.customerId === 'string' ? record.customerId : record.customerId._id) : ''
     setForm({
-      supplierId,
+      customerId,
       collectionDate: record.collectionDate.slice(0, 10),
       session: record.session,
       milkType: record.milkType,
@@ -104,12 +104,12 @@ export default function MilkCollection() {
   }
 
   function submit() {
-    if (!form.supplierId) { toast.error('Select a farmer first'); return }
+    if (!form.customerId) { toast.error('Select a registered customer first'); return }
     if (!form.quantityKg || !form.fatPercent || !form.snfPercent || !form.ratePerKg) {
       toast.error('Enter quantity, fat, SNF and purchase rate'); return
     }
-    if (selectedSupplier && !selectedSupplier.milkTypes.includes(form.milkType)) {
-      toast.error(`This farmer is not registered for ${form.milkType} milk`); return
+    if (selectedCustomer && selectedCustomer.milkType !== 'mixed' && selectedCustomer.milkType !== form.milkType) {
+      toast.error(`This customer is not registered for ${form.milkType} milk`); return
     }
     save.mutate()
   }
@@ -127,9 +127,9 @@ export default function MilkCollection() {
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Procurement · Farmer collection</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Milk procurement · Customer register</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Milk collection</h1>
-            <p className="mt-1 text-sm text-slate-500">Record analyzer readings and farmer purchase amount.</p>
+            <p className="mt-1 text-sm text-slate-500">Record machine weight, fat and SNF for a registered customer.</p>
           </div>
           <div className="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white p-1 sm:self-auto">
             <Button variant="ghost" size="icon" aria-label="Previous day" onClick={() => shiftDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
@@ -158,25 +158,25 @@ export default function MilkCollection() {
               </div>
 
               <div className="relative">
-                <label className="mb-1.5 block text-xs font-semibold text-slate-600">Farmer / supplier</label>
-                <button type="button" onClick={() => setSupplierOpen(value => !value)} className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
+                <label className="mb-1.5 block text-xs font-semibold text-slate-600">Customer *</label>
+                <button type="button" onClick={() => setCustomerOpen(value => !value)} className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
                   <UserRound className="h-4 w-4 shrink-0 text-emerald-700" />
-                  <span className={selectedSupplier ? 'min-w-0 flex-1 truncate text-sm font-medium text-slate-800' : 'min-w-0 flex-1 text-sm text-slate-400'}>{selectedSupplier ? `${selectedSupplier.fullName} · ${selectedSupplier.supplierCode}` : 'Choose registered farmer'}</span>
+                  <span className={selectedCustomer ? 'min-w-0 flex-1 truncate text-sm font-medium text-slate-800' : 'min-w-0 flex-1 text-sm text-slate-400'}>{selectedCustomer ? `${selectedCustomer.fullName} · ${selectedCustomer.customerId}` : 'Choose registered customer'}</span>
                   <ChevronRight className="h-4 w-4 rotate-90 text-slate-400" />
                 </button>
-                {supplierOpen && (
+                {customerOpen && (
                   <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                     <div className="relative border-b border-slate-100 p-2">
                       <Search className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input autoFocus value={search} onChange={event => setSearch(event.target.value)} placeholder="Search farmer, ID, mobile or village" className="h-10 w-full rounded-lg bg-slate-50 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-100" />
+                      <input autoFocus value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name, ID, mobile or village" className="h-10 w-full rounded-lg bg-slate-50 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                     <div className="max-h-56 overflow-y-auto p-1">
-                      {suppliersLoading ? <p className="p-4 text-center text-sm text-slate-500">Loading farmers…</p> : filteredSuppliers.length ? filteredSuppliers.map(supplier => (
-                        <button key={supplier._id} type="button" onClick={() => { change('supplierId', supplier._id); setSupplierOpen(false); setSearch('') }} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50">
-                          <span><span className="block text-sm font-medium text-slate-800">{supplier.fullName}</span><span className="text-xs text-slate-500">{supplier.supplierCode} · {supplier.mobile}{supplier.village ? ` · ${supplier.village}` : ''}</span></span>
-                          <span className="text-[10px] uppercase text-slate-400">{supplier.milkTypes.join(' / ')}</span>
+                      {customersLoading ? <p className="p-4 text-center text-sm text-slate-500">Loading customers…</p> : filteredCustomers.length ? filteredCustomers.map(customer => (
+                        <button key={customer._id} type="button" onClick={() => { change('customerId', customer._id); setCustomerOpen(false); setSearch('') }} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50">
+                          <span><span className="block text-sm font-medium text-slate-800">{customer.fullName}</span><span className="text-xs text-slate-500">{customer.customerId} · {customer.mobile}{customer.village ? ` · ${customer.village}` : ''}</span></span>
+                          <span className="text-[10px] uppercase text-slate-400">{customer.milkType}</span>
                         </button>
-                      )) : <p className="p-4 text-center text-sm text-slate-500">No farmer found. Add a farmer from Farmers first.</p>}
+                      )) : <p className="p-4 text-center text-sm text-slate-500">No customers found. Register a customer first.</p>}
                     </div>
                   </div>
                 )}
@@ -191,7 +191,7 @@ export default function MilkCollection() {
                 </Field>
                 <Field label="Milk type">
                   <div className="grid grid-cols-2 gap-2">
-                    {(['cow', 'buffalo'] as const).map(type => <Choice key={type} active={form.milkType === type} disabled={!!selectedSupplier && !selectedSupplier.milkTypes.includes(type)} onClick={() => change('milkType', type)}>{type === 'cow' ? 'Cow' : 'Buffalo'}</Choice>)}
+                    {(['cow', 'buffalo'] as const).map(type => <Choice key={type} active={form.milkType === type} disabled={!!selectedCustomer && selectedCustomer.milkType !== 'mixed' && selectedCustomer.milkType !== type} onClick={() => change('milkType', type)}>{type === 'cow' ? 'Cow' : 'Buffalo'}</Choice>)}
                   </div>
                 </Field>
               </div>
@@ -208,7 +208,7 @@ export default function MilkCollection() {
               </div>
 
               <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${form.qualityStatus === 'accepted' ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50'}`}>
-                <div><p className="text-xs font-medium text-slate-500">Farmer payable for this entry</p><p className="mt-0.5 text-xs text-slate-400">Quantity × purchase rate {form.qualityStatus === 'rejected' && '· rejected milk is not payable'}</p></div>
+                <div><p className="text-xs font-medium text-slate-500">Customer milk value for this entry</p><p className="mt-0.5 text-xs text-slate-400">Quantity × rate {form.qualityStatus === 'rejected' && '· rejected milk is not payable'}</p></div>
                 <p className={`text-xl font-bold ${form.qualityStatus === 'accepted' ? 'text-emerald-800' : 'text-rose-700'}`}>{formatCurrency(amount)}</p>
               </div>
               <Field label="Notes · optional"><textarea value={form.notes} onChange={event => change('notes', event.target.value)} rows={2} maxLength={500} placeholder="Machine reference, can number or quality note" className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></Field>
@@ -223,15 +223,16 @@ export default function MilkCollection() {
                 <Button variant="outline" size="icon" aria-label="Refresh collection records" onClick={() => refetch()}><RefreshCw className="h-4 w-4" /></Button>
               </div>
               {isLoading ? <div className="p-8 text-center text-sm text-slate-500">Loading collection register…</div> : isError ? <div className="p-8 text-center"><p className="text-sm text-rose-600">Could not load collection records.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Try again</Button></div> : !records.length ? (
-                <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><Droplets className="h-6 w-6" /></div><p className="mt-3 text-sm font-medium text-slate-800">No collection recorded</p><p className="mt-1 text-xs text-slate-500">Choose a farmer and record the analyzer reading.</p></div>
+                <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><Droplets className="h-6 w-6" /></div><p className="mt-3 text-sm font-medium text-slate-800">No collection recorded</p><p className="mt-1 text-xs text-slate-500">Choose a registered customer and record the analyzer reading.</p></div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {records.map(record => {
-                    const supplier = typeof record.supplierId === 'string' ? null : record.supplierId
+                    const customer = typeof record.customerId === 'string' ? null : record.customerId
+                    const legacySupplier = typeof record.supplierId === 'string' ? null : record.supplierId
                     return <article key={record._id} className="p-4 transition hover:bg-slate-50/70 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{supplier?.fullName || 'Farmer'} <span className="ml-1 text-xs font-normal text-slate-400">{supplier?.supplierCode}</span></p><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" />{record.session === 'morning' ? 'Morning' : 'Evening'} · {record.milkType} milk · {record.receiptNumber}</p></div>
-                        <Button variant="ghost" size="icon" aria-label="Edit collection" onClick={() => editRecord(record)}><Pencil className="h-4 w-4" /></Button>
+                        <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{customer?.fullName || legacySupplier?.fullName || 'Customer'} <span className="ml-1 text-xs font-normal text-slate-400">{customer?.customerId || legacySupplier?.supplierCode}</span></p><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" />{record.session === 'morning' ? 'Morning' : 'Evening'} · {record.milkType} milk · {record.receiptNumber}</p></div>
+                        {record.customerId && <Button variant="ghost" size="icon" aria-label="Edit collection" onClick={() => editRecord(record)}><Pencil className="h-4 w-4" /></Button>}
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
                         <Reading label="Quantity" value={`${record.quantityKg.toFixed(2)} kg`} />
@@ -239,7 +240,7 @@ export default function MilkCollection() {
                         <Reading label="SNF" value={`${record.snfPercent.toFixed(1)}%`} />
                         <Reading label="Rate / Amount" value={`${formatCurrency(record.ratePerKg)}/kg`} sub={formatCurrency(record.amount)} />
                       </div>
-                      <div className="mt-3 flex items-center justify-between"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${record.qualityStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.qualityStatus === 'accepted' ? 'Accepted' : 'Rejected'}</span><span className="text-xs text-slate-400">{supplier?.village || supplier?.mobile || ''}</span></div>
+                      <div className="mt-3 flex items-center justify-between"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${record.qualityStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{record.qualityStatus === 'accepted' ? 'Accepted' : 'Rejected'}</span><span className="text-xs text-slate-400">{customer?.village || customer?.mobile || legacySupplier?.mobile || ''}</span></div>
                     </article>
                   })}
                 </div>

@@ -54,16 +54,18 @@ export default function CustomerLogin() {
 
         <div className="bg-white rounded-2xl shadow-2xl p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">Customer Login</h2>
-          <p className="text-sm text-gray-500 mb-6">अपने Customer ID और Password से लॉगिन करें</p>
+          <p className="text-sm text-gray-500 mb-6">Admin से मिले mobile number और password से लॉगिन करें</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Customer ID / Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Registered mobile number</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   {...register('username')}
-                  placeholder="ds001"
+                  inputMode="tel"
+                  autoComplete="username"
+                  placeholder="9876543210"
                   className="w-full h-11 pl-10 pr-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
@@ -94,7 +96,7 @@ export default function CustomerLogin() {
 
           <div className="mt-5 p-3 bg-brand-50 rounded-xl">
             <p className="text-xs text-brand-700 font-medium">💡 नोट:</p>
-            <p className="text-xs text-brand-600 mt-1">अपना Username और Password डेयरी एडमिन से लें। इस डिवाइस पर लॉगिन करने के बाद आप लॉगआउट तक सीधे वापस आ सकेंगे।</p>
+            <p className="text-xs text-brand-600 mt-1">अपना registered mobile number और password डेयरी एडमिन से लें।</p>
           </div>
 
           <p className="text-center text-sm text-gray-500 mt-4">

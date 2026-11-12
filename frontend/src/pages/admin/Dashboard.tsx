@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Users, Droplets, TrendingUp, AlertCircle, Milk, Moon, Sun, ArrowRight, UserRound, FlaskConical } from 'lucide-react'
+import { Users, Droplets, TrendingUp, AlertCircle, Milk, Moon, Sun, ArrowRight, FlaskConical } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,11 +30,8 @@ async function fetchAnalytics() {
 async function fetchProcurementToday() {
   const date = new Date()
   const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  const [collections, suppliers] = await Promise.all([
-    api.get('/api/milk-procurement', { params: { date: today, limit: 1 } }),
-    api.get('/api/suppliers', { params: { status: 'active', limit: 1 } }),
-  ])
-  return { summary: collections.data.pagination?.summary || {}, supplierCount: suppliers.data.pagination?.total || 0 }
+  const collections = await api.get('/api/milk-procurement', { params: { date: today, limit: 1 } })
+  return { summary: collections.data.pagination?.summary || {} }
 }
 
 export default function Dashboard() {
@@ -79,7 +76,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard title="आज का दूध संग्रह" value={Number(procurement?.summary?.acceptedLitres || 0)} suffix="L" icon={<FlaskConical className="w-5 h-5" />} color="green" subtitle={`${Number(procurement?.summary?.rejectedLitres || 0).toFixed(1)} L rejected`} />
         <StatCard title="आज किसान देय" value={Number(procurement?.summary?.payable || 0)} prefix="₹" icon={<TrendingUp className="w-5 h-5" />} color="purple" subtitle="Accepted collections" />
-        <StatCard title="Active farmers" value={procurement?.supplierCount || 0} icon={<UserRound className="w-5 h-5" />} color="blue" subtitle="Registered suppliers" />
+        <StatCard title="Active customers" value={dash?.activeCustomers || 0} icon={<Users className="w-5 h-5" />} color="blue" subtitle="Registered milk suppliers" />
         <StatCard title="कुल ग्राहक" value={dash?.totalCustomers || 0} icon={<Users className="w-5 h-5" />} color="green" subtitle={`${dash?.activeCustomers || 0} active`} />
         <StatCard title="Customer supply" value={dash?.todayMilkTotal || 0} suffix="L" icon={<Droplets className="w-5 h-5" />} color="blue" subtitle={`☀️ ${(dash?.morningTotal||0).toFixed(1)}L  🌙 ${(dash?.eveningTotal||0).toFixed(1)}L`} />
         <StatCard title="Monthly sales" value={dash?.monthlyRevenue || 0} prefix="₹" icon={<AlertCircle className="w-5 h-5" />} color="amber" subtitle={`Outstanding ₹${(dash?.totalOutstanding || 0).toLocaleString('en-IN')}`} />

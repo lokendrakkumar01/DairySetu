@@ -15,6 +15,7 @@ import { getMonthRange } from '../utils/dateUtils';
 const CreateCustomerSchema = z.object({
   fullName: z.string().min(2).max(100),
   mobile: z.string().min(10).max(15),
+  password: z.string().min(6).max(100).optional(),
   address: z.string().optional(),
   village: z.string().optional(),
   milkType: z.enum(['cow', 'buffalo', 'mixed']).optional(),
@@ -97,6 +98,7 @@ export async function createCustomerHandler(req: AuthRequest, res: Response): Pr
       dairyId: req.user.dairyId,
       fullName: body.fullName,
       mobile: body.mobile,
+      password: body.password,
       address: body.address,
       village: body.village,
       milkType: body.milkType,

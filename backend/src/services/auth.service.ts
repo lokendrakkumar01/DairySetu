@@ -166,9 +166,10 @@ export async function loginCustomer(
   dairyId?: string
 ): Promise<LoginResult> {
   const normalizedUsername = username.trim().toLowerCase();
+  const mobileUsername = username.replace(/\D/g, '');
 
   const query: Record<string, unknown> = {
-    username: normalizedUsername,
+    $or: [{ username: normalizedUsername }, ...(mobileUsername ? [{ username: mobileUsername }] : [])],
     role: 'customer',
     isActive: true,
   };

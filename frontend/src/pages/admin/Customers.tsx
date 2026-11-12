@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 const customerSchema = z.object({
   fullName: z.string().min(2, 'Name required'),
   mobile: z.string().min(10, 'Valid mobile required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   village: z.string().optional(),
   address: z.string().optional(),
   milkType: z.enum(['cow', 'buffalo', 'mixed']).default('mixed'),
@@ -66,7 +67,7 @@ export default function Customers() {
 
   const shareCredentials = async () => {
     if (!createdCreds) return
-    const message = `Namaste! ${createdCreds.dairyName} ke customer portal par login karne ke liye:\nCustomer ID: ${createdCreds.customerId}\nUsername: ${createdCreds.username}\nPassword: ${createdCreds.password}\nLogin: ${window.location.origin}/customer/login\n\nIs message ko surakshit rakhein.`
+    const message = `Namaste! ${createdCreds.dairyName} ke customer portal par login karne ke liye:\nMobile: ${createdCreds.username}\nPassword: ${createdCreds.password}\nLogin: ${window.location.origin}/customer/login\n\nIs message ko surakshit rakhein.`
     const digits = createdCreds.mobile.replace(/\D/g, '')
     const localNumber = digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits
     const phone = localNumber.length === 10 ? `91${localNumber}` : localNumber
@@ -173,6 +174,11 @@ export default function Customers() {
                     <input {...register('mobile')} placeholder="9876543210" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
                     {errors.mobile && <p className="text-xs text-red-500 mt-1">{errors.mobile.message}</p>}
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Customer login password *</label>
+                    <input {...register('password')} type="password" autoComplete="new-password" placeholder="At least 6 characters" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                    {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">गाँव</label>
                     <input {...register('village')} placeholder="Ramnagar" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
@@ -223,7 +229,7 @@ export default function Customers() {
                   <span className="font-mono font-bold text-brand-700">{createdCreds.customerId}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Username:</span>
+                  <span className="text-gray-600">Mobile login:</span>
                   <span className="font-mono font-bold">{createdCreds.username}</span>
                 </div>
                 <div className="flex justify-between">
@@ -233,7 +239,7 @@ export default function Customers() {
               </div>
               <p className="text-xs text-gray-400 text-center mt-3">यह पासवर्ड सिर्फ़ अभी दिखेगा। इसे ग्राहक को भेजें; भूलने पर नया पासवर्ड बनाया जा सकता है।</p>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(`Customer ID: ${createdCreds.customerId}\nUsername: ${createdCreds.username}\nPassword: ${createdCreds.password}`); toast.success('Credentials copied') } catch { toast.error('Copy is unavailable in this browser') } }}><Copy className="h-4 w-4" />Copy</Button>
+                <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(`Mobile: ${createdCreds.username}\nPassword: ${createdCreds.password}`); toast.success('Credentials copied') } catch { toast.error('Copy is unavailable in this browser') } }}><Copy className="h-4 w-4" />Copy</Button>
                 <Button onClick={shareCredentials} className="bg-green-600 hover:bg-green-700"><MessageCircle className="h-4 w-4" />WhatsApp</Button>
               </div>
               <Button className="w-full mt-2" variant="ghost" onClick={() => setCreatedCreds(null)}>ठीक है</Button>

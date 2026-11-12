@@ -5,7 +5,8 @@ export type MilkQualityStatus = 'accepted' | 'rejected';
 
 export interface IMilkProcurement extends Document {
   dairyId: Types.ObjectId;
-  supplierId: Types.ObjectId;
+  supplierId?: Types.ObjectId;
+  customerId?: Types.ObjectId;
   collectionDate: Date;
   session: CollectionSession;
   milkType: 'cow' | 'buffalo';
@@ -25,7 +26,8 @@ export interface IMilkProcurement extends Document {
 
 const MilkProcurementSchema = new Schema<IMilkProcurement>({
   dairyId: { type: Schema.Types.ObjectId, ref: 'DairyAccount', required: true },
-  supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier', required: true },
+  supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   collectionDate: { type: Date, required: true },
   session: { type: String, enum: ['morning', 'evening'], required: true },
   milkType: { type: String, enum: ['cow', 'buffalo'], required: true },
@@ -42,7 +44,8 @@ const MilkProcurementSchema = new Schema<IMilkProcurement>({
 }, { timestamps: true });
 
 MilkProcurementSchema.index({ dairyId: 1, collectionDate: -1, session: 1 });
-MilkProcurementSchema.index({ dairyId: 1, supplierId: 1, collectionDate: 1, session: 1, milkType: 1 }, { unique: true });
+MilkProcurementSchema.index({ dairyId: 1, customerId: 1, collectionDate: 1, session: 1, milkType: 1 }, { unique: true, partialFilterExpression: { customerId: { $exists: true } } });
+MilkProcurementSchema.index({ dairyId: 1, supplierId: 1, collectionDate: 1, session: 1, milkType: 1 }, { unique: true, partialFilterExpression: { supplierId: { $exists: true } } });
 MilkProcurementSchema.pre('save', function () {
   this.amount = this.qualityStatus === 'accepted'
     ? Math.round(this.quantityKg * this.ratePerKg * 100) / 100

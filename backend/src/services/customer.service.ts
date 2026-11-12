@@ -8,6 +8,7 @@ interface CreateCustomerPayload {
   dairyId: string;
   fullName: string;
   mobile: string;
+  password?: string;
   address?: string;
   village?: string;
   milkType?: 'cow' | 'buffalo' | 'mixed';
@@ -48,11 +49,10 @@ export async function createCustomer(
   });
 
   // Create user account for customer
-  const tempPassword = generateTempPassword();
+  const tempPassword = payload.password || generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
-  // Keep the visible dairy customer ID short while making the login name
-  // distinct across dairies, where IDs such as DS001 are reused.
-  const username = `${customerId.toLowerCase()}-${dairyObjectId.toString().slice(-8)}`;
+  // Customer accounts sign in with the mobile number they registered with.
+  const username = payload.mobile.replace(/\D/g, '');
 
   const user = await User.create({
     dairyId: dairyObjectId,
@@ -129,7 +129,8 @@ export async function resetCustomerPassword(
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
 
-  const user = await User.findByIdAndUpdate(customer.userId, { $set: { passwordHash }, $unset: { refreshToken: 1 } }, { new: true });
+  const username = customer.mobile.replace(/\D/g, '');
+  const user = await User.findByIdAndUpdate(customer.userId, { $set: { passwordHash, username }, $unset: { refreshToken: 1 } }, { new: true });
   if (!user) {
     const err = new Error('Customer login account not found') as Error & { statusCode: number };
     err.statusCode = 404;

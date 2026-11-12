@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, Users, Milk, FileText, CreditCard, UserRound,
+  LayoutDashboard, Users, Milk, FileText, CreditCard,
   BarChart3, Settings, LogOut, Menu, X, ChevronRight, Droplets
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext'
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', labelHi: 'डैशबोर्ड' },
   { to: '/admin/milk-entry', icon: Milk, label: 'Milk Collection', labelHi: 'दूध संग्रह' },
-  { to: '/admin/suppliers', icon: UserRound, label: 'Farmers', labelHi: 'किसान' },
   { to: '/admin/customer-supply', icon: Droplets, label: 'Customer Supply', labelHi: 'ग्राहक सप्लाई' },
   { to: '/admin/customers', icon: Users, label: 'Customers', labelHi: 'ग्राहक' },
   { to: '/admin/bills', icon: FileText, label: 'Bills', labelHi: 'बिल' },
@@ -23,7 +22,6 @@ const navItems = [
 const bottomNavItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Home' },
   { to: '/admin/milk-entry', icon: Milk, label: 'Collect' },
-  { to: '/admin/suppliers', icon: UserRound, label: 'Farmers' },
   { to: '/admin/customers', icon: Users, label: 'Customers' },
   { to: '/admin/payments', icon: CreditCard, label: 'Payments' },
 ]
@@ -109,7 +107,7 @@ export default function AdminLayout() {
             <motion.aside
               initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 h-full w-72 bg-white z-50 lg:hidden shadow-2xl flex flex-col"
+              className="fixed left-0 top-0 h-[100dvh] w-[min(88vw,400px)] bg-white z-50 lg:hidden shadow-2xl flex flex-col"
             >
               <div className="p-5 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -125,7 +123,7 @@ export default function AdminLayout() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <nav className="flex-1 overflow-y-auto py-3 px-3">
+              <nav className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain py-3 px-3">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.to}

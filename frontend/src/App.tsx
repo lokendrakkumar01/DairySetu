@@ -11,7 +11,6 @@ const Customers = lazy(() => import('@/pages/admin/Customers'))
 const CustomerDetail = lazy(() => import('@/pages/admin/CustomerDetail'))
 const CustomerMilkEntry = lazy(() => import('@/pages/admin/MilkEntry'))
 const MilkCollection = lazy(() => import('@/pages/admin/MilkCollection'))
-const Suppliers = lazy(() => import('@/pages/admin/Suppliers'))
 const Bills = lazy(() => import('@/pages/admin/Bills'))
 const BillDetail = lazy(() => import('@/pages/admin/BillDetail'))
 const Payments = lazy(() => import('@/pages/admin/Payments'))
@@ -71,7 +70,6 @@ export default function App() {
         <Route path="customers/:id" element={<CustomerDetail />} />
         <Route path="milk-entry" element={<MilkCollection />} />
         <Route path="customer-supply" element={<CustomerMilkEntry />} />
-        <Route path="suppliers" element={<Suppliers />} />
         <Route path="bills" element={<Bills />} />
         <Route path="bills/:id" element={<BillDetail />} />
         <Route path="payments" element={<Payments />} />
