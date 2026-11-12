@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Plus, Droplets, History } from 'lucide-react'
+import { Plus, Droplets } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,15 +10,17 @@ import { formatDate } from '@/lib/utils'
 import { format } from '@/lib/utils'
 import api from '@/lib/api'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Rates() {
   const qc = useQueryClient()
+  const { dairy } = useAuth()
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ milkType: 'cow', ratePerLitre: '', effectiveFrom: format(new Date(), 'yyyy-MM-dd'), customerId: '' })
+  const [form, setForm] = useState({ milkType: 'cow', rateUnit: 'litre', ratePerLitre: '', effectiveFrom: format(new Date(), 'yyyy-MM-dd'), customerId: '' })
 
   const { data: ratesData, isLoading } = useQuery({
-    queryKey: ['rates'],
-    queryFn: () => api.get('/api/milk-rates').then(r => r.data),
+    queryKey: ['rates', 'all'],
+    queryFn: () => api.get('/api/milk-rates', { params: { rateUnit: 'all', includeCustomerRates: true } }).then(r => r.data),
   })
 
   const { data: customersData } = useQuery({
@@ -32,7 +34,7 @@ export default function Rates() {
       qc.invalidateQueries({ queryKey: ['rates'] })
       toast.success('दर सेट की गई!')
       setShowAdd(false)
-      setForm({ milkType: 'cow', ratePerLitre: '', effectiveFrom: format(new Date(), 'yyyy-MM-dd'), customerId: '' })
+      setForm({ milkType: 'cow', rateUnit: 'litre', ratePerLitre: '', effectiveFrom: format(new Date(), 'yyyy-MM-dd'), customerId: '' })
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Error'),
   })
@@ -40,8 +42,10 @@ export default function Rates() {
   const rates = ratesData?.data || []
   const customers = customersData?.data || []
 
-  const defaultRates = rates.filter((r: any) => !r.customerId)
+  const defaultRates = rates.filter((r: any) => !r.customerId && r.rateUnit !== 'kg')
+  const purchaseRates = rates.filter((r: any) => !r.customerId && r.rateUnit === 'kg')
   const customRates = rates.filter((r: any) => r.customerId)
+  const rateUnitLabel = form.rateUnit === 'kg' ? 'किलो' : 'लीटर'
 
   const milkTypeColor: Record<string, string> = {
     cow: 'bg-amber-100 text-amber-700',
@@ -54,7 +58,7 @@ export default function Rates() {
       <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">दूध दर</h1>
-          <p className="text-sm text-gray-500">Milk rate management</p>
+          <p className="text-sm text-gray-500">{dairy?.dairyName || 'इस डेयरी'} की दूध बिक्री और खरीद दरें</p>
         </div>
         <Button onClick={() => setShowAdd(true)} size="sm">
           <Plus className="w-4 h-4" /> नई दर
@@ -65,7 +69,7 @@ export default function Rates() {
         <>
           {/* Default Rates */}
           <Card>
-            <CardHeader><CardTitle>Default Rates (सभी ग्राहक)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Customer supply rates (₹/L · सभी ग्राहक)</CardTitle></CardHeader>
             <CardContent>
               {!defaultRates.length ? (
                 <p className="text-sm text-gray-400 text-center py-4">कोई default rate नहीं — Add करें</p>
@@ -88,6 +92,25 @@ export default function Rates() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader><CardTitle>Milk purchase rates (₹/kg · इस डेयरी के collection)</CardTitle></CardHeader>
+            <CardContent>
+              {!purchaseRates.length ? <p className="text-sm text-gray-400 text-center py-4">अभी purchase rate नहीं है — Milk Collection इसे manually भरने देगा।</p> : (
+                <div className="space-y-3">
+                  {purchaseRates.map((r: any) => (
+                    <div key={r._id} className="flex items-center justify-between gap-3 py-3 border-b border-gray-50 last:border-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize ${milkTypeColor[r.milkType]}`}>{r.milkType}</span>
+                        <div><p className="text-sm font-medium text-gray-800">₹{r.ratePerLitre}/kg</p><p className="text-xs text-gray-400">{formatDate(r.effectiveFrom)}</p></div>
+                      </div>
+                      <Badge variant="success">Current</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Custom Rates */}
           {customRates.length > 0 && (
             <Card>
@@ -99,8 +122,8 @@ export default function Rates() {
                       <div className="flex items-center gap-3">
                         <span className={`px-2 py-1 rounded-lg text-xs font-semibold capitalize ${milkTypeColor[r.milkType]}`}>{r.milkType}</span>
                         <div>
-                          <p className="text-sm font-medium text-gray-800">₹{r.ratePerLitre}/L</p>
-                          <p className="text-xs text-gray-400">Customer specific · {formatDate(r.effectiveFrom)}</p>
+                          <p className="text-sm font-medium text-gray-800">₹{r.ratePerLitre}/{r.rateUnit === 'kg' ? 'kg' : 'L'}</p>
+                          <p className="text-xs text-gray-400">{r.customerId?.fullName || 'Customer'} · {formatDate(r.effectiveFrom)}</p>
                         </div>
                       </div>
                       <span className="text-xs text-brand-600 font-medium">Custom</span>
@@ -121,6 +144,13 @@ export default function Rates() {
             <h2 className="font-bold text-gray-900 mb-4">नई दर सेट करें</h2>
             <div className="space-y-3">
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rate kis kaam ke liye?</label>
+                <select value={form.rateUnit} onChange={e => setForm(p => ({ ...p, rateUnit: e.target.value }))} className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                  <option value="litre">ग्राहक को दूध सप्लाई (₹ / लीटर)</option>
+                  <option value="kg">डेयरी में दूध खरीद / collection (₹ / kg)</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">दूध प्रकार</label>
                 <select value={form.milkType} onChange={e => setForm(p => ({ ...p, milkType: e.target.value }))}
                   className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
@@ -130,8 +160,8 @@ export default function Rates() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">दर प्रति लीटर (₹) *</label>
-                <input type="number" step="0.5" value={form.ratePerLitre} onChange={e => setForm(p => ({ ...p, ratePerLitre: e.target.value }))}
+                <label className="block text-sm font-medium text-gray-700 mb-1">दर प्रति {rateUnitLabel} (₹) *</label>
+                <input type="number" min="0.01" step="0.01" value={form.ratePerLitre} onChange={e => setForm(p => ({ ...p, ratePerLitre: e.target.value }))}
                   placeholder="60" className="w-full h-10 px-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>

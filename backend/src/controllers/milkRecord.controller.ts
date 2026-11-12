@@ -37,6 +37,7 @@ async function getApplicableRate(
     dairyId,
     customerId,
     milkType,
+    rateUnit: { $in: ['litre', null] },
     effectiveFrom: { $lte: date },
     $or: [{ effectiveTo: null }, { effectiveTo: { $gte: date } }],
   }).sort({ effectiveFrom: -1 }).lean();
@@ -46,6 +47,7 @@ async function getApplicableRate(
     dairyId,
     customerId: null,
     milkType,
+    rateUnit: { $in: ['litre', null] },
     effectiveFrom: { $lte: date },
     $or: [{ effectiveTo: null }, { effectiveTo: { $gte: date } }],
   }).sort({ effectiveFrom: -1 }).lean();

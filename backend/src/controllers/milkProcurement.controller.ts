@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { AuthRequest } from '../types';
 import Customer from '../models/Customer';
 import MilkProcurement from '../models/MilkProcurement';
+import MilkRate from '../models/MilkRate';
+import { resolveMilkRate } from '../utils/milkRateUtils';
 import AuditLog from '../models/AuditLog';
 import { sendError, sendSuccess } from '../utils/responseHelper';
 import { startOfDay, endOfDay } from '../utils/dateUtils';
@@ -24,6 +26,18 @@ const RecordSchema = z.object({
 });
 
 const dayDate = (date: string) => startOfDay(new Date(`${date}T00:00:00`));
+
+async function getConfiguredPurchaseRate(dairyId: Types.ObjectId, customerId: Types.ObjectId, milkType: 'cow' | 'buffalo', date: Date): Promise<number | null> {
+  const rates = await MilkRate.find({
+    dairyId,
+    customerId: { $in: [customerId, null] },
+    milkType: { $in: [milkType, 'mixed'] },
+    rateUnit: 'kg',
+    effectiveFrom: { $lte: date },
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: date } }],
+  }).sort({ effectiveFrom: -1 }).lean();
+  return resolveMilkRate(rates as any[], customerId.toString(), milkType, 'kg');
+}
 
 export async function listProcurements(req: AuthRequest, res: Response): Promise<void> {
   if (!req.user) { sendError(res, 'Unauthorized', 401); return; }
@@ -60,8 +74,11 @@ export async function createProcurement(req: AuthRequest, res: Response): Promis
   const customer = await Customer.findOne({ _id: customerId, dairyId, isActive: true });
   if (!customer) { sendError(res, 'Active customer not found in this dairy', 404); return; }
   if (customer.milkType !== 'mixed' && customer.milkType !== data.milkType) { sendError(res, `This customer is registered for ${customer.milkType} milk`, 422); return; }
-  const record = await MilkProcurement.create({ ...data, dairyId, customerId, collectionDate: dayDate(data.collectionDate), receiptNumber: `COL-${Date.now()}-${new Types.ObjectId().toString().slice(-5).toUpperCase()}`, recordedBy: new Types.ObjectId(req.user.userId) });
-  await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_RECORDED', entityType: 'MilkProcurement', entityId: record._id, newValue: { customerId, quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg: record.ratePerKg, amount: record.amount }, ip: req.ip });
+  const collectionDate = dayDate(data.collectionDate);
+  const configuredRate = await getConfiguredPurchaseRate(dairyId, customerId, data.milkType, collectionDate);
+  const ratePerKg = configuredRate ?? data.ratePerKg;
+  const record = await MilkProcurement.create({ ...data, ratePerKg, dairyId, customerId, collectionDate, receiptNumber: `COL-${Date.now()}-${new Types.ObjectId().toString().slice(-5).toUpperCase()}`, recordedBy: new Types.ObjectId(req.user.userId) });
+  await AuditLog.create({ dairyId, userId: new Types.ObjectId(req.user.userId), action: 'MILK_PROCUREMENT_RECORDED', entityType: 'MilkProcurement', entityId: record._id, newValue: { customerId, quantityKg: record.quantityKg, fatPercent: record.fatPercent, snfPercent: record.snfPercent, ratePerKg, amount: record.amount }, ip: req.ip });
   await record.populate('customerId', 'customerId fullName mobile village milkType');
   sendSuccess(res, record, 'Milk collection saved', 201);
 }

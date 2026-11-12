@@ -158,23 +158,17 @@ export async function deleteCustomerHandler(req: AuthRequest, res: Response): Pr
     const dairyId = new Types.ObjectId(req.user.dairyId);
     const cust = await Customer.findOne({ _id: id, dairyId });
     if (!cust) { sendError(res, 'Customer not found', 404); return; }
-    const [hasPayments, hasBills, hasAdjustments] = await Promise.all([
-      Payment.exists({ customerId: cust._id, dairyId }),
-      MonthlyBill.exists({ customerId: cust._id, dairyId }),
-      Adjustment.exists({ customerId: cust._id, dairyId }),
-    ]);
-    if (hasPayments || hasBills || hasAdjustments) {
-      sendError(res, 'Customer has payment, bill, or adjustment history and cannot be permanently deleted. Keep the account inactive to preserve the financial records.', 409);
-      return;
-    }
     await Promise.all([
       MilkRecord.deleteMany({ customerId: cust._id, dairyId }),
       MilkProcurement.deleteMany({ customerId: cust._id, dairyId }),
       MilkRate.deleteMany({ customerId: cust._id, dairyId }),
+      Payment.deleteMany({ customerId: cust._id, dairyId }),
+      MonthlyBill.deleteMany({ customerId: cust._id, dairyId }),
+      Adjustment.deleteMany({ customerId: cust._id, dairyId }),
       User.findByIdAndDelete(cust.userId),
     ]);
     await Customer.deleteOne({ _id: cust._id, dairyId });
-    sendSuccess(res, null, 'Customer and records permanently deleted');
+    sendSuccess(res, null, 'Customer, login, milk and financial records permanently deleted');
     return;
   }
 

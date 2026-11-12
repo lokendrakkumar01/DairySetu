@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
+import { calculateMilkProcurementAmount } from '../utils/milkRateUtils';
 
 export type CollectionSession = 'morning' | 'evening';
 export type MilkQualityStatus = 'accepted' | 'rejected';
@@ -47,9 +48,7 @@ MilkProcurementSchema.index({ dairyId: 1, collectionDate: -1, session: 1 });
 MilkProcurementSchema.index({ dairyId: 1, customerId: 1, collectionDate: 1, session: 1, milkType: 1 }, { unique: true, partialFilterExpression: { customerId: { $exists: true } } });
 MilkProcurementSchema.index({ dairyId: 1, supplierId: 1, collectionDate: 1, session: 1, milkType: 1 }, { unique: true, partialFilterExpression: { supplierId: { $exists: true } } });
 MilkProcurementSchema.pre('save', function () {
-  this.amount = this.qualityStatus === 'accepted'
-    ? Math.round(this.quantityKg * this.ratePerKg * 100) / 100
-    : 0;
+  this.amount = calculateMilkProcurementAmount(this.quantityKg, this.ratePerKg, this.qualityStatus === 'accepted');
 });
 
 export default mongoose.model<IMilkProcurement>('MilkProcurement', MilkProcurementSchema);

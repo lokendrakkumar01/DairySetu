@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/app.ts",
     "build": "tsc",
+    "test:pricing": "npm run build && node --test scripts/pricing.test.js",
     "start": "node dist/src/app.js",
     "seed": "node dist/seeds/seed.js",
     "clean-duplicates": "node scripts/cleanDuplicates.js"

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, Check, ChevronLeft, ChevronRight, Clock3, Droplets, FlaskConical, Pencil, RefreshCw, Search, Thermometer, Trash2, UserRound, X } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -32,6 +32,11 @@ export default function MilkCollection() {
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
     queryKey: ['customers', 'active', 'milk-collection'],
     queryFn: async () => (await api.get('/api/customers', { params: { status: 'active', limit: 200 } })).data.data,
+  })
+  const { data: purchaseRates = [] } = useQuery<any[]>({
+    queryKey: ['rates', 'purchase', form.customerId, form.milkType, form.collectionDate],
+    enabled: !!form.customerId,
+    queryFn: async () => (await api.get('/api/milk-rates', { params: { customerId: form.customerId, rateUnit: 'kg', asOf: form.collectionDate } })).data.data,
   })
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['milk-procurement', date],
@@ -81,7 +86,23 @@ export default function MilkCollection() {
   const filteredCustomers = useMemo(() => customers.filter(customer =>
     `${customer.fullName} ${customer.customerId} ${customer.mobile} ${customer.village || ''}`.toLowerCase().includes(search.toLowerCase())
   ).slice(0, 8), [customers, search])
+  const configuredPurchaseRate = useMemo(() => {
+    if (!form.customerId) return null
+    const customerRateFor = (type: string) => purchaseRates.find(rate => {
+      const rateCustomerId = typeof rate.customerId === 'string' ? rate.customerId : rate.customerId?._id
+      return rateCustomerId === form.customerId && rate.milkType === type
+    })
+    const dairyRateFor = (type: string) => purchaseRates.find(rate => !rate.customerId && rate.milkType === type)
+    const rate = customerRateFor(form.milkType) || customerRateFor('mixed') || dairyRateFor(form.milkType) || dairyRateFor('mixed')
+    return rate ? Number(rate.ratePerLitre) : null
+  }, [purchaseRates, form.customerId, form.milkType])
   const amount = form.qualityStatus === 'accepted' ? numberValue(form.quantityKg) * numberValue(form.ratePerKg) : 0
+
+  useEffect(() => {
+    if (!editingId && configuredPurchaseRate !== null) {
+      setForm(current => ({ ...current, ratePerKg: String(configuredPurchaseRate) }))
+    }
+  }, [configuredPurchaseRate, editingId])
 
   function clearForm() {
     setForm(blankForm())
@@ -91,7 +112,7 @@ export default function MilkCollection() {
   }
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm(current => ({ ...current, [key]: value }))
+    setForm(current => ({ ...current, [key]: value, ...(!editingId && (key === 'collectionDate' || key === 'milkType') ? { ratePerKg: '' } : {}) }))
     if (key === 'collectionDate') setDate(value as string)
   }
 
@@ -183,7 +204,7 @@ export default function MilkCollection() {
                     </div>
                     <div className="max-h-56 overflow-y-auto p-1">
                       {customersLoading ? <p className="p-4 text-center text-sm text-slate-500">Loading customers…</p> : filteredCustomers.length ? filteredCustomers.map(customer => (
-                        <button key={customer._id} type="button" onClick={() => { change('customerId', customer._id); setCustomerOpen(false); setSearch('') }} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50">
+                        <button key={customer._id} type="button" onClick={() => { setForm(current => ({ ...current, customerId: customer._id, ratePerKg: '' })); setCustomerOpen(false); setSearch('') }} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50">
                           <span><span className="block text-sm font-medium text-slate-800">{customer.fullName}</span><span className="text-xs text-slate-500">{customer.customerId} · {customer.mobile}{customer.village ? ` · ${customer.village}` : ''}</span></span>
                           <span className="text-[10px] uppercase text-slate-400">{customer.milkType}</span>
                         </button>
@@ -211,7 +232,7 @@ export default function MilkCollection() {
                 <Field label="Machine weight (kg)" icon={<Droplets className="h-3.5 w-3.5" />}><NumericInput value={form.quantityKg} min="0.01" step="0.01" onChange={value => change('quantityKg', value)} placeholder="0.000" /></Field>
                 <Field label="Fat (%)" icon={<FlaskConical className="h-3.5 w-3.5" />}><NumericInput value={form.fatPercent} min="0" max="20" step="0.1" onChange={value => change('fatPercent', value)} placeholder="e.g. 4.2" /></Field>
                 <Field label="SNF (%)" icon={<Activity className="h-3.5 w-3.5" />}><NumericInput value={form.snfPercent} min="0" max="20" step="0.1" onChange={value => change('snfPercent', value)} placeholder="e.g. 8.5" /></Field>
-                <Field label="Purchase rate (₹/kg)"><NumericInput value={form.ratePerKg} min="0" step="0.01" onChange={value => change('ratePerKg', value)} placeholder="₹ per kg" /></Field>
+                <Field label="Purchase rate (₹/kg)"><NumericInput value={form.ratePerKg} min="0" step="0.01" readOnly={configuredPurchaseRate !== null && !editingId} onChange={value => change('ratePerKg', value)} placeholder={configuredPurchaseRate === null ? 'Set rate in Rates or enter here' : `Dairy rate · ₹${configuredPurchaseRate}/kg`} /><span className="mt-1 block text-[10px] text-slate-400">{editingId ? 'This saved collection rate can be corrected here.' : configuredPurchaseRate !== null ? 'Configured for this dairy; applied automatically.' : 'No purchase rate is configured; enter this collection’s rate.'}</span></Field>
                 <Field label="Temperature (°C) · optional" icon={<Thermometer className="h-3.5 w-3.5" />}><NumericInput value={form.temperatureC} min="0" max="100" step="0.1" onChange={value => change('temperatureC', value)} placeholder="Optional" /></Field>
                 <Field label="Quality check">
                   <select value={form.qualityStatus} onChange={event => change('qualityStatus', event.target.value as FormState['qualityStatus'])} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"><option value="accepted">Accepted</option><option value="rejected">Rejected</option></select>
@@ -219,7 +240,7 @@ export default function MilkCollection() {
               </div>
 
               <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${form.qualityStatus === 'accepted' ? 'border-emerald-100 bg-emerald-50/80' : 'border-rose-100 bg-rose-50'}`}>
-                <div><p className="text-xs font-medium text-slate-500">Customer milk value for this entry</p><p className="mt-0.5 text-xs text-slate-400">Quantity × rate {form.qualityStatus === 'rejected' && '· rejected milk is not payable'}</p></div>
+                <div><p className="text-xs font-medium text-slate-500">Milk collection payable</p><p className="mt-0.5 text-xs text-slate-400">Weight × purchase rate {form.qualityStatus === 'rejected' && '· rejected milk is not payable'}</p></div>
                 <p className={`text-xl font-bold ${form.qualityStatus === 'accepted' ? 'text-emerald-800' : 'text-rose-700'}`}>{formatCurrency(amount)}</p>
               </div>
               <Field label="Notes · optional"><textarea value={form.notes} onChange={event => change('notes', event.target.value)} rows={2} maxLength={500} placeholder="Machine reference, can number or quality note" className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></Field>
@@ -273,8 +294,8 @@ function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: 
 function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return <label className="block min-w-0"><span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600">{icon && <span className="text-emerald-700">{icon}</span>}{label}</span>{children}</label>
 }
-function NumericInput({ value, onChange, ...props }: { value: string; onChange: (value: string) => void; min?: string; max?: string; step?: string; placeholder?: string }) {
-  return <input type="number" inputMode="decimal" value={value} onChange={event => onChange(event.target.value)} {...props} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm tabular-nums outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+function NumericInput({ value, onChange, ...props }: { value: string; onChange: (value: string) => void; min?: string; max?: string; step?: string; placeholder?: string; readOnly?: boolean }) {
+  return <input type="number" inputMode="decimal" value={value} onChange={event => onChange(event.target.value)} {...props} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm tabular-nums outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-500" />
 }
 function Choice({ active, disabled, onClick, children }: { active: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button type="button" disabled={disabled} onClick={onClick} className={`min-h-10 rounded-xl border px-2 text-xs font-semibold transition ${disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300' : active ? 'border-emerald-600 bg-emerald-700 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-800'}`}>{children}</button>
