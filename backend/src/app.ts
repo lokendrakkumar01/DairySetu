@@ -19,6 +19,8 @@ import paymentRoutes from './routes/payment.routes';
 import reportRoutes from './routes/report.routes';
 import notificationRoutes from './routes/notification.routes';
 import settingsRoutes from './routes/settings.routes';
+import supplierRoutes from './routes/supplier.routes';
+import milkProcurementRoutes from './routes/milkProcurement.routes';
 
 const app = express();
 
@@ -62,6 +64,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/milk-procurement', milkProcurementRoutes);
 
 // 404 handler
 app.use((_req, res) => {

@@ -64,8 +64,11 @@ This creates:
 
 ### Admin Portal
 - 📊 Business analytics dashboard
+- 🧑‍🌾 Farmer and milk supplier register
+- 🧪 Milk procurement entry with machine weight, fat, SNF, session, quality status, rate, and collection receipt
+- 📚 Supplier-wise procurement history and purchase totals
 - 👥 Customer management (unlimited)
-- 🥛 Daily milk entry (quick + bulk mode)
+- 🥛 Customer milk supply entry (quick + bulk mode)
 - 💰 Monthly billing engine
 - 💳 Payment tracking
 - 📄 Bill generation (PNG/PDF/WhatsApp)
@@ -123,6 +126,15 @@ GET    /api/admin/dashboard
 GET    /api/admin/profile
 PUT    /api/admin/profile
 
+GET    /api/suppliers
+POST   /api/suppliers
+GET    /api/suppliers/:id
+PUT    /api/suppliers/:id
+
+GET    /api/milk-procurement
+POST   /api/milk-procurement
+PUT    /api/milk-procurement/:id
+
 GET    /api/customers
 POST   /api/customers
 GET    /api/customers/:id
@@ -133,6 +145,8 @@ GET    /api/milk-records
 POST   /api/milk-records
 PUT    /api/milk-records/:id
 POST   /api/milk-records/bulk
+
+The Milk Collection module records analyzer readings (fat and SNF) and machine weight in kg separately from litre-based customer supply records. The purchase rate per kg is entered according to the dairy's rate chart; automatic fat/SNF rate calculation requires configuring that chart.
 
 GET    /api/milk-rates
 POST   /api/milk-rates

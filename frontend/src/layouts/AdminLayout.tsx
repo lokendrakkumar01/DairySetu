@@ -2,14 +2,16 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, Users, Milk, FileText, CreditCard,
+  LayoutDashboard, Users, Milk, FileText, CreditCard, UserRound,
   BarChart3, Settings, LogOut, Menu, X, ChevronRight, Droplets
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', labelHi: 'डैशबोर्ड' },
-  { to: '/admin/milk-entry', icon: Milk, label: 'Milk Entry', labelHi: 'दूध एंट्री' },
+  { to: '/admin/milk-entry', icon: Milk, label: 'Milk Collection', labelHi: 'दूध संग्रह' },
+  { to: '/admin/suppliers', icon: UserRound, label: 'Farmers', labelHi: 'किसान' },
+  { to: '/admin/customer-supply', icon: Droplets, label: 'Customer Supply', labelHi: 'ग्राहक सप्लाई' },
   { to: '/admin/customers', icon: Users, label: 'Customers', labelHi: 'ग्राहक' },
   { to: '/admin/bills', icon: FileText, label: 'Bills', labelHi: 'बिल' },
   { to: '/admin/payments', icon: CreditCard, label: 'Payments', labelHi: 'भुगतान' },
@@ -20,9 +22,9 @@ const navItems = [
 
 const bottomNavItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { to: '/admin/milk-entry', icon: Milk, label: 'Entry' },
+  { to: '/admin/milk-entry', icon: Milk, label: 'Collect' },
+  { to: '/admin/suppliers', icon: UserRound, label: 'Farmers' },
   { to: '/admin/customers', icon: Users, label: 'Customers' },
-  { to: '/admin/bills', icon: FileText, label: 'Bills' },
   { to: '/admin/payments', icon: CreditCard, label: 'Payments' },
 ]
 
@@ -170,14 +172,14 @@ export default function AdminLayout() {
         </main>
 
         {/* Mobile Bottom Nav */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30 safe-area">
-          <div className="flex items-center justify-around px-2 py-1">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex items-center justify-around px-1 py-1">
             {bottomNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 px-2 py-2 rounded-xl min-w-[56px] transition-colors
+                  `flex flex-col items-center gap-0.5 px-1.5 py-2 rounded-xl min-w-[56px] transition-colors
                   ${isActive ? 'text-brand-600' : 'text-gray-400'}`
                 }
               >

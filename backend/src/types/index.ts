@@ -34,6 +34,7 @@ export interface ApiResponse<T = unknown> {
     page: number;
     limit: number;
     pages: number;
+    summary?: Record<string, number>;
   };
 }
 
